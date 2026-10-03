@@ -4,7 +4,7 @@
 #SBATCH --partition=cpu_short
 #SBATCH --array=1-53
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=4G
+#SBATCH --mem=16G
 #SBATCH --time=00:45:00
 #SBATCH --output=/scratch/ans9868/invasive-drift/logs/id_grid_%A_%a.out
 #SBATCH --error=/scratch/ans9868/invasive-drift/logs/id_grid_%A_%a.err
