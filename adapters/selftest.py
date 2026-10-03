@@ -33,6 +33,15 @@ def make_ref(rng, d=12, k=4, K=8, n=800):
                 dirOK=np.ones(K, bool), v_mu0=v.mean(0), v_cov0=np.cov(v, rowvar=False) + 1e-6 * np.eye(2))
 
 
+def topk(X, k):
+    return np.linalg.svd(X - X.mean(0), full_matrices=False)[2][:k].T
+
+
+def mean_angle(P, Q):
+    s = np.linalg.svd(P.T @ Q, compute_uv=False)
+    return float(np.mean(np.arccos(np.clip(s, -1, 1))))
+
+
 class LinDec:
     def __init__(self, W):
         self.coef_ = W
@@ -85,8 +94,11 @@ def main():
     check("cov_lowrank_matches_cov_k", np.allclose(Cl, ref["C0k"], atol=3e-2))
     cc = A.get("subspace").fit(Zf, ref)
     check("subspace_shape", cc.apply(Zf).shape == Zf.shape)
-    check("subspace_reduces_ref_distance",
-          np.linalg.norm(np.cov(cc.apply(Zf).T) - ref["C0"]) < np.linalg.norm(np.cov(Zf.T) - ref["C0"]))
+    k5 = 5
+    ang_raw = mean_angle(topk(Zf, k5), topk(ref["Zref"], k5))
+    ang_aln = mean_angle(topk(cc.apply(Zf), k5), topk(ref["Zref"], k5))
+    check("subspace_reduces_subspace_angle", ang_aln < ang_raw,
+          f"raw={np.degrees(ang_raw):.1f}deg -> aligned={np.degrees(ang_aln):.1f}deg")
 
     print("\ngray landmark / aligned:")
     dirbin = rng.integers(0, 8, size=len(Zf))
@@ -114,7 +126,8 @@ def main():
         a = A.get(nm)
         try:
             a.fit(Zf, ref, decoder=dec, y=None, dirbin=dirbin)
-            ok = a.apply(Zf).shape == Zf.shape
+            inp = dec.predict(Zf) if a.stage == "output" else Zf
+            ok = a.apply(inp).shape[0] == Zf.shape[0]
         except Exception as exc:  # noqa: BLE001
             ok = False
             print("        err:", nm, exc)
