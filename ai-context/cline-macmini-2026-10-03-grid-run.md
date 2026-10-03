@@ -201,4 +201,99 @@ window-based v2** npz sitting in **`temp-trash/`** (no `gfit_mask`/`geval_mask`)
 | Torch `artifacts/perich_subC/` | 53 `.npz` + 53 `.decoders.pkl` |
 | Torch `temp-trash/` | the OLD v2 npz — do **not** reuse |
 
+## 10. Post-run: the std-floor bug, the fix, and the RE-RUN (2026-10-03, later)
+
+### 10.1 The bug (found by READING the 53 CSVs — no smoke test caught it)
+28 rows with **R² < −1e6, min −7.8e9**. ALL were **`mom_diag`**; `N_frac` counts 16/8/4/**0** for
+0.1/0.25/0.5/1.0 (**gone at max N**). `moving_frac`/`speed_mean` were normal → never a motionless window.
+
+**Cause:** `_MomDiag` divided by `Zfit.std(0) + 1e-6`. A unit near-constant in the **fit-pool prefix** has
+std ≈ 0 → gain `sd0/std` ≈ 1e6. The **N-dependence is the fingerprint** (short prefixes are likeliest to
+contain a constant unit).
+
+**Why the smoke missed it — three independent reasons (all now fixed):**
+1. `adapters/selftest.py` used `rng.normal(...).clip(0.5, 2)`, so **every unit had std ≥ 0.5** — the
+   degenerate path was **mathematically unreachable**.
+2. The tracer ran `--sessions 1` = **`CO-20131003`**, a **clean** session. The four affected sessions were
+   `CO-20131220`, `CO-20161021`, `CO-20131101`, `CO-20160909`.
+3. Checks were **structural** (columns present, CSV fresh, `.shape[0]`, `rc=0`) — a valid float of −1e9
+   passes all of them. And the one value-level assertion (`r2_vw == r2_all`) was **blind by construction**:
+   both quantities are built from the same `y` and `p`, so they blow up *together* and agree perfectly.
+
+### 10.2 The fix — clamp the GAIN, not the input
+`adapters/base.py::safe_scale(sw, ref_sd, gain_max=GAIN_MAX=10)` → `sw = max(sw, ref_sd/GAIN_MAX)`.
+For healthy units (`sw ≈ ref_sd`) it is an **exact no-op** → non-degenerate cells are **bit-identical**;
+collapsed units are bounded at **×10 instead of ×1e6**. Applied to `mom_diag`, `mom_diag_self`,
+`shuffled_ref`, `mom_global`, `null_proj`.
+
+Also: **`null_proj` DROPPED from `config.json`.** It was `noop=True` in **1060/1060** rows — it never ran,
+because it needs `decoder.coef_` and **no decoder exposes it** (ridge/wiener use `mdl.coef_`; kf uses
+`self.C` in **state** space; mlp uses `coefs_`; gru has none). Its premise is only well-defined for a
+static linear current-time readout = **1 of 5** decoders; for `wiener` the row space lives in the
+**lagged** space `d·(L+1)`. Kept + fixed in the library, removed from the config. **12 → 11 adapters.**
+
+### 10.3 Guards added (so this class of bug cannot return silently)
+1. `adapters/selftest.py::bounded_with_constant_fitunit:*` — fit every adapter on data with an **exactly
+   constant** unit, apply to *varying* data, assert `max|out| < 1e3`. **Fails on the old code, passes on
+   the new** — the direct regression test.
+2. Contract sweeps now assert **finiteness + magnitude**, not just `.shape[0]`.
+3. `smoke.sbatch` L3/L3c — tracer now runs the **CANARY session `CO-20131220`** (worst offender, index 9)
+   instead of the first sorted artifact, and asserts **`max|r2_all| < 1e4`**.
+
+### 10.4 The RE-RUN (job `19125433`)
+**53/53 `rc=0`, zero errors, zero OOM**, `--mem=16G` everywhere. **12,720 rows × 73 cols × 12 objectives.**
+Pre-fix CSVs archived → `trash/prev-run-1791065039` and `temp-analysis/`.
+
+| check | before | after |
+|---|---|---|
+| `r2_all` min | −7,823,699,580 | **−5.1340** |
+| rows < −10 | 28 | **0** |
+| `mom_diag` rows < −1 | **31** | **4** (= the no-op baseline) |
+| every other objective | — | **unchanged to the digit** |
+| `aligned=True` | 3,180 | 2,120 |
+| `causal=False` | 2,120 | 1,060 |
+
+**At N=1.0 every paired delta is identical to pre-fix** → the `safe_scale` no-op property, confirmed on
+real data. `mom_diag` moved ≤0.0001.
+
+### 10.5 Lesson
+The fix changed 28 outliers' **magnitude**, not the conclusion. **A median over 1,060 cells is robust to
+2.6% outliers** — so P1/P2/P3 are unchanged. **A mean-based pipeline would have reported garbage and we
+would never have known.** The median/IQR convention (from NoMAD) is the only reason the bug hit the tail
+and not the answer. **Keep it, and keep this file's §7 process rules.**
+
+## 11. Findings from the clean data — FULL WRITE-UP: `../findings/2026-10-03_adapter_grid_results.md`
+
+**P1 FAILS** — ladder vs `identity` is **not monotone**: `mom_global −0.0009` → `mom_diag +0.0065` →
+`cov_lowrank +0.0039` → `zca −0.0015`. But there IS one real rung: **per-unit beats global**
+(`mom_diag − mom_global = +0.0074`, 76.6% improved, sign p≈0), and **`zca` is significantly WORSE than
+plain per-unit** (p=1.1e-10 → d²≈10,000 params overfits). **Resolution matters; moment order does not.**
+
+**P2 CONFIRMED, emphatically** — `subspace` **−0.1711**, IQR [−0.294, −0.110], only **3.8%** of cells
+improved (96% got worse), harmful in every decoder (ridge −0.137 … mlp −0.251) and every N.
+`centroid_proc` (gray) −0.0128. **Sanity-checked and REAL:** `corr_rel = 0.892` (a full-rank, 61-unit
+correction ~89% the size of the signal), halves output speed (`speed_ratio` 0.582→0.287), decorrelates
+(`corr_vx` 0.585→0.345). Sane magnitudes throughout. Contrast `centroid_proc`: confined (rank **7**,
+corr_rel 0.168) → far milder damage. **Confining the correction limits the damage.**
+
+**P3 REFUTED — the headline finding.** The negative control `shuffled_ref` (reference permuted **across
+units**) scores **+0.0082** ≈ the real `mom_diag_self` **+0.0085** / `mom_diag` **+0.0065**, by decoder too
+(ridge +0.0102 both, wiener +0.0133 both). And **`mom_diag` is significantly WORSE than its own shuffled
+control** (−0.0024, 34.7% of cells better, **p=6.5e-07**). → **Which unit gets which target moments is
+irrelevant.** This is generic re-standardisation, NOT drift realignment — and it reproduces
+`normalizer_perspective.md` at grid scale. Consequence: **NoMAD's per-channel z-score is not doing what it
+is believed to do.**
+
+**Only `out_affine` clearly helps (+0.0146, 90.2% improved) — and it is LABELED** (a 2×2 affine fit =
+cheap supervised recalibration). Its label-free twin `out_mom` **hurts** (−0.0655, 105 failure rows).
+→ **Stage isn't the discriminator; the objective is.**
+
+**Ceilings (now measurable):** `r2_persist_lag1 = 0.9941`, `r2_target = 0.5726`, baseline 0.3171.
+Headroom to the target ceiling = 0.256; `out_affine` captures **5.7%** of it, `mom_diag_self` 3.3%,
+`mom_diag` 2.5%. **Unsupervised within-session adaptation ≈ a null result.**
+
+**Stats convention, locked:** median / IQR / % improved / paired sign test — **never mean±std** (§10.5).
+
+
+
 

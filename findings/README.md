@@ -46,6 +46,15 @@ Dated finding notes from the invasive-drift MVP. One file per topic; newest date
   moment order the drift lives in* (NoMAD ≈ `mom_diag`+`zca`, Aligned FA ≈ direction-only). Also locks the
   measurement conventions (no per-bin CIs; across-session std / across-pair IQR + signed-rank) and the
   "do-not-claim" list.
+- `2026-10-03_adapter_grid_results.md` — ⭐ **THE GRID RESULTS (53 sessions × 5 decoders × 12 objectives × 4 N
+  = 12,720 rows).** **P1 FAILS** (moment ladder not monotone: `mom_global` −0.0009 → `mom_diag` +0.0065 →
+  `cov_lowrank` +0.0039 → `zca` −0.0015; but per-unit DOES beat global, +0.0074, p≈0). **P2 CONFIRMED**
+  (`subspace` **−0.1711**, only 3.8% of cells improved, harmful in every decoder; verified real via
+  `corr_rel`=0.89 full-rank, not a blow-up). **P3 REFUTED** — the negative control `shuffled_ref` scores
+  **+0.0082** ≈ the real `mom_diag_self` **+0.0085**, and `mom_diag` is *significantly worse than its own
+  shuffled control* (p=6.5e-07) → the gain is **generic re-standardisation, not identity-specific**.
+  Only **`out_affine`** (+0.0146, 90%) clearly helps — and it is **supervised**. Unsupervised within-session
+  adaptation ≈ null (+2.7% relative, 3–6% of headroom).
 - `2026-10-03_prior_art_falcon_nomad.md` — **read of the two defining papers.** FALCON = the benchmark
   (continuous/causal eval, **no trial labels**, R² = **variance-weighted** multi-output, held-in/held-out
   splits, published baseline table incl. **zero-shot WF 0.34±0.06** on M1-A); NoMAD = the SOTA (LFADS +

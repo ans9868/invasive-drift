@@ -170,3 +170,45 @@ is meaningless. Config adapters: **12 → 11**.
 **Status:** fix implemented locally. Smoke + a re-run decision still to come — the re-run needs sign-off
 (and `--mem=16G`, which is now the known-good value).
 
+## Progress log 8 (the RE-RUN + verification, 2026-10-03)
+
+Re-ran the full grid after the std-floor fix (log 7). Job **`19125433`**, array 1–53, `--mem=16G`.
+**53/53 `rc=0`, zero errors, zero OOM.** Pre-fix CSVs archived to **`trash/prev-run-1791065039`**
+(a second copy in `temp-analysis/`).
+
+**Result: 12,720 rows × 73 cols × 12 objectives** (= 53 × 5 × 12 × 4, where 12 = 11 config adapters + `none`).
+
+### Verification table — before → after
+
+| check | before | after |
+|---|---|---|
+| `r2_all` **min** | **−7,823,699,580** | **−5.1340** |
+| `r2_all` max | 0.7935 | 0.7935 *(unchanged)* |
+| rows < −10 | **28** | **0** |
+| rows < −1e6 | **28** | **0** |
+| rows < −1 | 168 | 137 |
+| **`mom_diag` rows < −1** | **31** | **4** — = the no-op baseline (`identity`/`none` are both 4) |
+| every **other** objective | — | **unchanged to the digit** |
+| `r2_vw` vs `r2_all` | — | max **RELATIVE** diff **2.2e-10** |
+| `aligned=True` | 3,180 | **2,120** (`null_proj` gone) |
+| `causal=False` | 2,120 | **1,060** (`null_proj` gone) |
+
+### The key structural result
+
+**At N=1.0 every paired delta is byte-for-byte IDENTICAL to the pre-fix run** — `out_affine +0.0146`,
+`mom_diag_self +0.0085`, `shuffled_ref +0.0082`, `mom_diag +0.0065`, `cov_lowrank +0.0039`,
+`zca −0.0015`, `subspace −0.1711` — and `mom_diag_self` / `shuffled_ref` / `cov_lowrank` / `zca` are
+identical across **all four N**. `mom_diag` moved by **≤0.0001**. That is exactly the predicted
+`safe_scale` no-op property holding on real data (`mom_diag` had **zero** degenerate rows at N=1.0).
+
+### What this means
+
+The fix changed the **magnitude of 28 outliers**, not the conclusion — a median over 1,060 cells is robust
+to 2.6% outliers. So **P1/P2/P3 are unchanged**. But the data is now plottable, **mean/std-usable**, and the
+1e9 spikes can no longer poison downstream work (P5, trainable adapters, per-decoder cards).
+
+**Recorded deliberately:** a mean-based pipeline would have reported garbage and we would never have known.
+The **median/IQR convention (borrowed from NoMAD)** is the only reason this bug corrupted the tail and not
+the answer. Keep it.
+
+
