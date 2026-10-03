@@ -102,3 +102,16 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
     → Need more rows to trust +0.50.
 - **NEXT:** more sessions/rows — relax guard (accept ≥4 blocks), shorter blocks (e.g. 2–3 min), and/or
   add other subjects (sub-M has 28, sub-T 12). Then reformulate `D_h` (or drop it).
+
+## log (cont.)
+- **DRIFT-CAUSE DONE** (`16_drift_cause.py`, job 19106025, **53 sessions**):
+  `corr(decay, weight-drift)=+0.525`, `corr(decay, functional-drift)=+0.526`,
+  `corr(decay, behavior-drift)=−0.433`; mean frozen R² 0.317 vs refit 0.332.
+  - **⇒ within-session drift = representational (functional tuning rotation), the main driver (r≈0.53,
+    ~28% of decay variance).** weight-drift ≈ functional-drift ⇒ **not a null-space artifact.**
+  - **Not behavior** (wrong sign), **not gain** (rate flat), **not loss** (waveforms stable).
+  - Recalibration: modest on average (+0.015) but large in some sessions (0.06→0.40).
+  - Reproduces, *within-session and in ephys*, the decomposition headline: **representational drift
+    dominates**; gain & loss absent at this timescale.
+- **NEXT:** pivot to the **cross-session waveform instrument** (`drafts/ideas.md` Idea 1).
+
