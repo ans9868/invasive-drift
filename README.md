@@ -14,6 +14,22 @@ persistence** — and can that drop be split into **unit loss / representational
   `--partition=cpu_short`).
 - `torch-jupyter-tmux-skill.md` — the notebook/tunnel runbook (tmux + `$SCRATCH`).
 
+## Within-session work — the current result
+
+- **`final-writeup.md`** — ⭐ the paper-style write-up: ***unsupervised within-session adaptation does not
+  correct neural drift*** (12 adapters × 5 decoders × 53 sessions, 12,720 cells). **Start here.**
+  Headline: P1 fails (the moment ladder is a *step, plateau, cliff*), P2 confirmed (`subspace` alignment
+  costs **−0.171 R²**), and **P3 refuted** — the per-unit reference correspondence is a **placebo** (a
+  shuffled control matches it, p=6.5e-07); the only clear win is **supervised**.
+- `grid_within_session_27/` — the experiment. `PLAN.md` is authoritative; `README.md` holds progress logs
+  1–8 (7 = the std-floor bug and fix, 8 = the re-run + verification).
+- `adapters/` — the adapter library (moment-order ladder, direction-only family, the shuffled control).
+- `findings/` — dated finding notes; **`findings/README.md` is the index.** For this work see
+  `2026-10-03_adapter_grid_framing.md` (the pre-registered P1–P5, written *before* the run) and
+  `2026-10-03_adapter_grid_results.md` (the outcome), plus `2026-10-03_prior_art_falcon_nomad.md`
+  (FALCON + NoMAD extraction).
+- `ai-context/` — session handoffs for whoever picks this up next.
+
 ## Key decisions (see `drafts/`)
 
 - **Scope = cross-session** (chronic same-probe), *not* cross-insertion (`drafts/08`).
