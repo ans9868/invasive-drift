@@ -33,6 +33,21 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
 
 ## Log
 
+- **INJECTION/CONFIRM TEST DONE** (`11_injection_test.py`, job 19104802) — synthetic const-accel smoother,
+  n=15, σ=0.05:
+  - coverage: slope/accel **over-cover (100% → CIs too wide)**; with acceleration present the **slope is
+    biased (−0.056) and misses** (slope↔accel trade-off).
+  - walk-forward 1-block skill (1−MSE/MSE_persist): `hist_slope` beats the const-accel `model`
+    (slope−0.05: 0.597 vs 0.510); **accel adds nothing** (accel case 0.465 vs 0.475); **steps smear the
+    const-accel model** (step case: hist_slope −0.079 vs model −0.676); on flat, slope predictors hurt
+    (correctly — no false skill).
+  - **CONCLUSIONS:** (a) the bar is the **historical-slope** baseline, not persistence; (b) **acceleration
+    is NOT forecastable** (our earlier Δaccel=+0.25 was over-fit) → drop/flag it; (c) **steps need a
+    separate change-point layer** (BOCPD/PELT); (d) report **Δ over hist-slope**.
+- **NEXT (12_degradation_v2):** per-block **σ_i (bootstrap)** → known-noise const-accel smoother; baselines
+  **persistence → hist-slope**; **floor-crossing probability**; **BOCPD/PELT** step layer; **drop accel**.
+  Then run on real sessions + sub-M/T.
+
 - **#1 DONE** (`08_within_forecast.py`, job 19097685). Rich features → **panel 0.570 > trend 0.515 >
   persistence 0.482**; ΔR² over trend **+0.055** (was −0.091). Caveats: corr *worse* than trend
   (0.757 vs 0.779), detrended fails, n=52 → *tentative*.
