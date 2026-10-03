@@ -46,4 +46,18 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
   - **rate of degradation**: regress the within-session `health(t)` slope (and/or cross-session slope);
   - **large degradations**: predict "crash" events (a block/boundary where R² falls sharply).
   Keep the bias ladder (`drafts/13`): chance → persistence → **trend** → panel, on detrended targets.
-- (#3 accept-negative, #4 cross-session matching) remain open.
+- **DEGRADATION FORECAST DONE** (`10_degradation_forecast.py`, job 19104112) — MLP decoder, denoised
+  `health(t)` (const-accel Kalman smoother → level/slope/accel), 6 long sessions / **45 rows**:
+  | target | persistence | trend | panel | Δpanel−trend |
+  |---|---|---|---|---|
+  | level | +0.813 | +0.909 | +0.916 | **+0.007** (tie — trivial) |
+  | **rate** | +0.277 | +0.285 | +0.785 | **+0.500** ✅ |
+  | **accel** | +0.350 | +0.377 | +0.627 | **+0.251** ✅ |
+  | D1 (5-min drop) | +0.790 | +0.790 | +0.501 | −0.288 |
+  | D3 (15-min drop) | −1.269 | −1.264 | −0.189 | +1.075 (unstable) |
+  - **Headline: rate & acceleration of degradation ARE forecastable beyond the trend.** Level is
+    trivial; raw fractional drop `D_h` is numerically fragile → prefer derivative targets.
+  - **Caveat:** only 6 sessions / 45 rows (the `<5 blocks` guard skipped all sessions < 25 min).
+    → Need more rows to trust +0.50.
+- **NEXT:** more sessions/rows — relax guard (accept ≥4 blocks), shorter blocks (e.g. 2–3 min), and/or
+  add other subjects (sub-M has 28, sub-T 12). Then reformulate `D_h` (or drop it).
