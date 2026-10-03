@@ -30,15 +30,21 @@ Bulk/derived → scratch; small summaries + figures → git.
 
 **Decoder-alignment flag** is a first-class column: `agnostic` (O1–O4, O9) vs `aligned` (O5–O8).
 
-## 3. Per-session protocol
+## 3. Per-session protocol (NO WINDOWS — see Idea 19)
 ```
-|<-- BURN-IN 20% -->|<---------------- ONLINE 80% ---------------->|
-   frozen decoders          window: |<-- FIT POOL 80% -->|<- EVAL 20% (fixed) ->|
-   5 cached models                  grow N = f*|pool|   (identical eval rows for all cells)
-   + reference stats
+|<-- BURN-IN 20% -->|<================== ONLINE 80% ==================>|
+   fit the 5 frozen     <== FIT POOL (first 80% of online) ==>|<- EVAL (last 20%) ->|
+   decoders + reference   adapter trains here                   EVERYTHING is scored here
+                                                                 N = prefix of the fit pool
 ```
-- **Fitting on the earlier part, scoring the later part** → causal within the window.
-- **Eval set is fixed** across every adapter and every N → all comparisons **paired**.
+- **BURN-IN (20 %)** fixes the scaler, the **5 frozen decoders**, and the **reference**. Never evaluated on.
+- **FIT POOL (first 80 % of ONLINE)** trains the **adapter**, and **ends exactly where the eval begins**
+  → the adapter is still temporally fresh (this is *why* windows aren't needed).
+- **EVAL (last 20 % of online)** is the **same rows for every adapter and every N** → all comparisons **paired**.
+- **N** = a prefix of the fit pool (first N % in time) → **causal**.
+- **20/80 = the decoder; 80/20 = the adapter.**
+- ⚠️ **Windows removed** (Idea 19). The **staleness instrument** keeps **2-min blocks** (`block_min`, `blk_*`).
+- Not zoo-comparable in absolute terms (decoder trains on 20 %, zoo used 80 %) — see **Idea 16**.
 
 ## 4. The three learning rates (all logged)
 | id | meaning | applies to |
@@ -47,9 +53,10 @@ Bulk/derived → scratch; small summaries + figures → git.
 | **LR-2** | **training dynamics** (loss curve, grad norm, epochs, early-stop) | trainable (mlp, gru, trainable adapters) |
 | **LR-3** | adapter-fit convergence | trainable adapters only |
 
-## 5. Record schema (long format — one row per cell × window)
-**keys/identity:** `session_id · window_idx · t_start_min · n_units · decoder · objective · form ·
-label_use · aligned · causal · output · N_frac · N_samples · seed`
+## 5. Record schema (long format — one row per cell)
+**keys/identity:** `session_id · split (grid|staleness) · block_idx · t_start_min · session_minutes ·
+n_blocks · short_recording · n_units · decoder · objective · form · label_use · aligned · causal ·
+output · N_frac · N_samples · seed · ctx_scope`
 **metrics — velocity:** `r2_all · r2_vx · r2_vy · corr_vx/vy · mse · bias_vx/vy · slope_vx/vy ·
 mse_bias2 · mse_var · lag_bins · r2_frozen · r2_refit`
 **metrics — direction/speed (Option A, ~free):** `ang_err_mean_deg · ang_bias_deg · ang_abs_err_deg ·
@@ -143,8 +150,8 @@ Because rows are stored **per cell × window**, session length needs **no separa
 `GROUP BY` at analysis time. Three tags are written into **every row**:
 ```
   session_minutes      total session length
-  n_windows            number of blocks the session yielded
-  short_recording      n_windows < 5
+  n_blocks             number of 2-min staleness blocks the session yielded
+  short_recording      n_blocks < 5
 ```
 **Three analysis-time views (free — same rows):**
 1. **all sessions** — headline

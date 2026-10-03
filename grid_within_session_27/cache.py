@@ -86,41 +86,49 @@ def build(path, cfg):
             dirC[kk] = Z[sm].mean(0); dirOK[kk] = True
     vbm = vel[bm]
     tstart = t0 + cfg["burnin_frac"] * dur
-    wsec = float(cfg.get("window_min", 3.0)) * 60.0          # FIXED-DURATION windows
-    W = int((ts[-1] - tstart) // wsec)
-    if W < cfg.get("min_windows", 2):
-        raise ValueError(f"too few windows ({W} x {wsec/60:.1f}min)")
-    tlen = wsec
-    fit_mask = np.zeros((W, len(ts)), bool); eval_mask = np.zeros((W, len(ts)), bool)
-    win_mask = np.zeros((W, len(ts)), bool)
-    win_t0 = np.full(W, np.nan); win_t1 = np.full(W, np.nan)
-    for w in range(W):
-        lo = tstart + w * tlen; hi = lo + tlen
-        inw = (ts >= lo) & (ts < hi)
-        ii = np.where(inw)[0]
-        if len(ii) < cfg["min_window_samples"]:
-            continue
-        win_mask[w, ii] = True
-        win_t0[w], win_t1[w] = lo - t0, hi - t0
-        cut = int(len(ii) * cfg["pool_frac"])
-        fit_mask[w, ii[:cut]] = True
-        eval_mask[w, ii[cut:]] = True
-    valid_w = (fit_mask.sum(1) >= cfg["min_fit_samples"]) & (eval_mask.sum(1) >= 100)
-    n_valid = int(valid_w.sum())
-    session_minutes = float(dur / 60.0)
-    short_recording = bool(n_valid < 5)
-    # ---- per-window CONTEXT (computed ONCE per window; broadcast to every cell) ----
+    online = ts[-1] - tstart
+    bin_s = cfg["bin_ms"] / 1000.0
     speed = np.linalg.norm(vel, axis=1)
     moving = speed > np.nanpercentile(speed, 60)
-    bin_s = cfg["bin_ms"] / 1000.0
+
+    # ---- GRID split (NO WINDOWS): fit pool = first pool_frac of ONLINE, eval = the tail ----
+    # (windows were removed 2026-10-03: locality survives without them, drift is slow so repeated
+    #  refits add little, and this gives a far larger fit pool + eval. See drafts/ideas.md Idea 19.)
+    oidx = np.where(ts >= tstart)[0]
+    if len(oidx) < cfg["min_fit_samples"] + 200:
+        raise ValueError(f"online too short ({len(oidx)} samples)")
+    gcut = oidx[int(len(oidx) * cfg["pool_frac"])]
+    gfit_mask = np.zeros(len(ts), bool); geval_mask = np.zeros(len(ts), bool)
+    gfit_mask[oidx[oidx < gcut]] = True
+    geval_mask[oidx[oidx >= gcut]] = True
+    if gfit_mask.sum() < cfg["min_fit_samples"] or geval_mask.sum() < 200:
+        raise ValueError("grid split too small")
+
+    # ---- STALENESS blocks (fixed duration; own knob; used by staleness.py ONLY) ----
+    bsec = float(cfg.get("block_min", 2.0)) * 60.0
+    B = int(online // bsec)
+    if B < cfg.get("min_blocks", 2):
+        raise ValueError(f"too few blocks ({B} x {bsec/60:.1f}min)")
+    blk_mask = np.zeros((B, len(ts)), bool)
+    blk_t0 = np.full(B, np.nan); blk_t1 = np.full(B, np.nan)
+    for b in range(B):
+        lo = tstart + b * bsec; hi = lo + bsec
+        ii = np.where((ts >= lo) & (ts < hi))[0]
+        if len(ii) < cfg["min_window_samples"]:
+            continue
+        blk_mask[b, ii] = True
+        blk_t0[b], blk_t1[b] = lo - t0, hi - t0
+    valid_b = blk_mask.sum(1) >= cfg["min_fit_samples"]
+    n_blocks = int(valid_b.sum())
+    session_minutes = float(dur / 60.0)
+    short_recording = bool(n_blocks < 5)
+
+    # ---- CONTEXT, two scopes: session (grid fit pool) + per-block (staleness) ----
     ctx_names = ["rate_mean", "rate_median", "frac_silent", "active_units", "mean_pairwise_corr",
                  "pc1_var", "eff_dim", "subspace_angle_deg", "speed_mean", "moving_frac", "dir_coverage"]
-    ctx = np.full((W, len(ctx_names)), np.nan, np.float32)
     rngc = np.random.default_rng(cfg.get("seed", 0))
-    for w in range(W):
-        rows = np.where(fit_mask[w])[0]
-        if len(rows) < cfg["min_fit_samples"]:
-            continue
+
+    def _ctx(rows):
         rate = X[rows].mean(0) / bin_s                       # Hz per unit
         Zw = Z[rows] - Z[rows].mean(0)
         _, Sw, Vh = np.linalg.svd(Zw, full_matrices=False)
@@ -131,19 +139,28 @@ def build(path, cfg):
         C = np.corrcoef(sub, rowvar=False)
         off = C[np.triu_indices_from(C, 1)]
         sp = speed[rows]; db = dirbin[rows]
-        ctx[w] = [rate.mean(), np.median(rate), float((rate < 0.5).mean()), float((rate >= 0.5).sum()),
-                  float(np.nanmean(off)), float(e[0] / e.sum()), float((e.sum() ** 2) / (e ** 2).sum()),
-                  float(np.degrees(np.mean(np.arccos(np.clip(cosang, -1, 1))))),
-                  float(sp.mean()), float(moving[rows].mean()),
-                  float(sum((db == kk).sum() >= cfg["min_dir_samples"] for kk in range(K)))]
+        return [rate.mean(), np.median(rate), float((rate < 0.5).mean()), float((rate >= 0.5).sum()),
+                float(np.nanmean(off)), float(e[0] / e.sum()), float((e.sum() ** 2) / (e ** 2).sum()),
+                float(np.degrees(np.mean(np.arccos(np.clip(cosang, -1, 1))))),
+                float(sp.mean()), float(moving[rows].mean()),
+                float(sum((db == kk).sum() >= cfg["min_dir_samples"] for kk in range(K)))]
+
+    ctx_sess = np.asarray(_ctx(np.where(gfit_mask)[0]), np.float32)
+    ctx_blk = np.full((B, len(ctx_names)), np.nan, np.float32)
+    for b in range(B):
+        rows = np.where(blk_mask[b])[0]
+        if len(rows) >= cfg["min_fit_samples"]:
+            ctx_blk[b] = _ctx(rows)
+
     return dict(Z=Z, vel=vel, pos=pos, ts=ts, burnin=bm, dirbin=dirbin.astype(np.int16),
                 mu0=Z[bm].mean(0), sd0=Z[bm].std(0) + 1e-6, C0=C0, C0k=C0k, P=P, Zref=Z[bm],
                 dirC=dirC, dirOK=dirOK, v_mu0=vbm.mean(0), v_cov0=np.cov(vbm, rowvar=False) + 1e-6 * np.eye(2),
-                m0=m0, s0=s0, fit_mask=fit_mask, eval_mask=eval_mask, valid_w=valid_w,
-                win_mask=win_mask, win_t0=win_t0, win_t1=win_t1,
-                session_minutes=session_minutes, n_windows=n_valid, short_recording=short_recording,
-                ctx=ctx, ctx_names=np.array(ctx_names),
-                n_units=d, dur=dur), (W, n_valid)
+                m0=m0, s0=s0,
+                gfit_mask=gfit_mask, geval_mask=geval_mask,
+                blk_mask=blk_mask, blk_t0=blk_t0, blk_t1=blk_t1, valid_b=valid_b,
+                session_minutes=session_minutes, n_blocks=n_blocks, short_recording=short_recording,
+                ctx_sess=ctx_sess, ctx_blk=ctx_blk, ctx_names=np.array(ctx_names),
+                n_units=d, dur=dur), (B, n_blocks)
 
 
 def git_rev():
@@ -175,7 +192,7 @@ def config_hash(cfg, src_path):
     st = os.stat(src_path)
     key = {k: cfg[k] for k in ("burnin_frac", "bin_ms", "tau_ms", "dir_bins", "pca_k", "seed", "decoders")
            if k in cfg}
-    key["cache_version"] = 2        # bump whenever the cached PAYLOAD format changes
+    key["cache_version"] = 3        # bump whenever the cached PAYLOAD format changes
     key["src"] = f"{os.path.basename(src_path)}:{st.st_size}:{int(st.st_mtime)}"
     return hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:12]
 
@@ -280,25 +297,23 @@ def main():
     files = sorted(f for f in os.listdir(data_dir) if f.endswith(".nwb"))
     if args.n:
         files = files[:args.n]
-    print(f"config: burnin={cfg['burnin_frac']} windows={cfg['n_windows']} pca_k={cfg['pca_k']}")
+    print(f"config: burnin={cfg['burnin_frac']} block_min={cfg.get('block_min')} pca_k={cfg['pca_k']}")
     print(f"{len(files)} session(s) -> {out_dir}")
     for f in files:
         t1 = time.time()
         try:
-            art, (W, nv) = build(os.path.join(data_dir, f), cfg)
+            art, (B, nv) = build(os.path.join(data_dir, f), cfg)
         except Exception as exc:  # noqa: BLE001
             print("SKIP", f, exc); continue
         sess = f.split("ses-")[1].split("_")[0]
         np.savez_compressed(os.path.join(out_dir, f"{sess}.npz"), **art)
         print(f"  {sess}: units={art['n_units']} T={len(art['ts'])} dur={art['dur']/60:.1f}min "
-              f"burnin={int(art['burnin'].sum())} windows={nv}/{W} (win={cfg['window_min']:.2f}min) "
+              f"burnin={int(art['burnin'].sum())} blocks={nv}/{B} (blk={cfg.get('block_min'):.2f}min) "
+              f"gfit={int(art['gfit_mask'].sum())} geval={int(art['geval_mask'].sum())} "
               f"short={bool(art['short_recording'])} dirs_ok={int(art['dirOK'].sum())} "
               f"({time.time()-t1:.1f}s)")
-        wv = np.where(art["valid_w"])[0]
-        if len(wv):
-            i0 = int(wv[0])
-            print("    ctx[%d]: " % i0 + "  ".join(
-                f"{nm}={art['ctx'][i0, i]:.3g}" for i, nm in enumerate(art["ctx_names"])))
+        print("    ctx_sess: " + "  ".join(
+            f"{nm}={art['ctx_sess'][i]:.3g}" for i, nm in enumerate(art["ctx_names"])))
         if args.with_decoders:
             srce = os.path.join(data_dir, f)
             h = config_hash(cfg, srce)

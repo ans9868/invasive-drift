@@ -19,7 +19,7 @@ def main():
         try:
             z = np.load(p, allow_pickle=True)
             rows.append((os.path.basename(p).split(".")[0], float(z["session_minutes"]),
-                         int(z["n_windows"]), bool(z["short_recording"]), int(z["n_units"])))
+                         int(z["n_blocks"]), bool(z["short_recording"]), int(z["n_units"])))
         except Exception as exc:  # noqa: BLE001
             print("SKIP", os.path.basename(p), exc)
     if not rows:

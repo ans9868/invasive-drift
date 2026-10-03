@@ -217,10 +217,35 @@ Block duration trades per-cell reliability against gap resolution. Run the stale
 sessions at **2 / 3 / 4.5 min** and confirm the *shape* of the curve is stable. *Lean: do it AFTER the
 first real curve* — don't stall the build for it.
 
+## Idea 19 — **Why we REMOVED windows from the grid** (2026-10-03) **[decision — done]**
+The grid originally cut the online period into fixed 2–3-min windows, each split 80/20 into a fit pool and
+an eval. **We removed the windows** after the cache distribution showed the median session yields only
+4–6 blocks, and after re-examining what windows actually buy:
+
+| windows bought | verdict |
+|---|---|
+| **temporal locality** (adapter trained adjacent to the eval) | **❌ not needed** — a single 80/20 split of the *online* period still ends the fit pool exactly where the eval begins, so the adapter is still trained on the data immediately preceding the eval |
+| **repeated refitting** ("does re-adapting help?") | **❌ buys little** — drift is ≈ **−0.002 R²/min**, i.e. ~0.02 R² over a 10-min lookback — *smaller than the per-cell noise* |
+| **a per-session trajectory** | **✅ but staleness already provides exactly this** |
+| **more cells** | **❌ outweighed** — one cell/session × 53 sessions × adapters × N is plenty |
+
+**What removing them GAINS:**
+- adapter fit pool: 96 s → **~9.6 min** (4 800 → 28 800 bins) → covariance adapters (`zca`) become estimable at large `d`;
+- eval set: 24 s → **~2.4 min** (1 200 → 7 200 bins) → R² noise ~±0.02 → **~±0.008**;
+- simpler design, and the grid's numbers land on the **same 80/20 geometry as the decoder zoo**.
+
+**What the grid becomes:** session-level **20/80** (*decoder*: burn-in → online) + **80/20** (*adapter*:
+first 80 % of online → last 20 %), with **N** = a prefix of the adapter's fit pool (still causal).
+**Windows survive only in the staleness instrument** (2-min blocks, `block_min`).
+
+⚠️ **Not** zoo-comparable in absolute terms: the grid's decoder trains on the **20 % burn-in**, the zoo
+trained on **80 %**. The zoo-comparable number is **Idea 16** (`sanity_8020.py`, which reproduced
+ridge 0.357 / wiener 0.404 / kf_posvel 0.393 **exactly**).
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
 the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11;
 direction head is Idea 12; multi-task is Idea 13; uncertainty is Idea 14; non-neural baselines is Idea 15;
-deferred checks are Ideas 16–18. Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment)
-→ 6 (Perich proxy) → 8. **9 is closed (negative).***
+deferred checks are Ideas 16–18; window removal is Idea 19. Revisit order: 7-redesign (≫d points) →
+10-redesign (low-rank alignment) → 6 (Perich proxy) → 8. **9 is closed (negative).***
 

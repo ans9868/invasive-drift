@@ -54,3 +54,14 @@ Status: **PLAN ONLY** — no code yet.
   `mlp=0.996` (held-out it was 0.576). Proposed fix: score `r2_burnin` on a **held-out half of burn-in**.
   Decide before P2-scale.
 - **Next:** **Step 0** — `baselines.py` → **Block 3**.
+
+## Progress log 4 (Idea 16 sanity + windows removed)
+- **Idea 16 DONE — perfect reproduction.** `sanity_8020.py` (job `19118091`) on 53 sessions:
+  **ridge 0.357 · wiener 0.404 · kf_posvel 0.393** — *exactly* the decoder zoo's numbers. The pipeline
+  (load → bin → standardise → `align_tail` → R²) is validated end-to-end against an independent script,
+  and the negative `r2_burnin_out` values are confirmed a **setting** effect, not a bug.
+- **Windows REMOVED from the grid** (Idea 19). `cache.py` now stores **`gfit_mask`/`geval_mask`**
+  (single 20/80-of-online split) + **`blk_mask`/`blk_t0`/`blk_t1`** (2-min blocks, **staleness only**) +
+  **`ctx_sess`** and **`ctx_blk`** (two context scopes). `config.json`: `block_min=2.0`, `min_blocks=2`.
+  `cache_version → 3`.
+- **Next:** re-run smoke (all 4 selftests + `cache --n 1 --with-decoders`) → **Block 2c**.
