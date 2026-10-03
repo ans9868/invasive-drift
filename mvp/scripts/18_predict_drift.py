@@ -125,7 +125,8 @@ def main():
                 cos[m].append(cosv(pv, truth))
                 # functional: decode NEXT block with predicted decoder (block-b scaling)
                 Xn = (XB[b + 1] - MB[b]) / SB[b]
-                w2 = pv.reshape(2, Xn.shape[1])   # (vx,vy) rows from raveled coef_
+                scale = np.linalg.norm(W[b]) / (np.linalg.norm(pv) + 1e-12)
+                w2 = (pv * scale).reshape(2, Xn.shape[1])   # predict DIRECTION; keep persistence gain
                 mse[m] += float(((Xn @ w2.T - VB[b + 1]) ** 2).sum())
             den += float(((VB[b + 1] - vel_mean) ** 2).sum())
         print(f"  {os.path.basename(p).split('ses-')[1].split('_')[0]}: nb={len(W)}")
