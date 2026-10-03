@@ -23,6 +23,11 @@ Dated finding notes from the invasive-drift MVP. One file per topic; newest date
 - `2026-10-03_lowrank_gate_and_volatility.md` — **low-rank gate PASSES** (drift PC1+2 = 0.80, ~2-D →
   a low-rank normalizer has a real shot); **volatility fails** (lag-1 autocorr 0.04 → memoryless, and
   does **not** lead the R² drop) → the entropy/early-warning route is closed.
+- `2026-10-03_lowrank_normalizer.md` — the **normalizer**: label-free **moment re-matching helps a little
+  (+10% of headroom)**; the **landmark low-rank rotation fails** (negative at all k) → drift is a
+  deformation, not a rotation.
+- `2026-10-03_mlp_confirms_gate.md` — **nonlinear MLP confirms the low-rank gate** (PC1+2 = 0.82 vs ridge
+  0.79) → not a linear artifact; volatility still memoryless & non-leading. (Caveat: per-block MLP unstable.)
 - `2026-10-03_waveform_probe.md` — waveforms stable within-session; **cross-session matcher works**
   (corr≈0.996) → unit-identity instrument.
 - `2026-10-03_degradation_forecast.md` — rate/accel NOT forecastable at 53 sessions; only a modest

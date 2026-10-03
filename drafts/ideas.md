@@ -113,10 +113,11 @@ yet usable functionally. Instead of **refitting** a decoder per block (needs lab
 **align** the current decoder to the **learned rotation axis**: penalize deviation from the estimated
 drift trajectory, or rotate the read-out by the estimated per-block rotation. Test whether this **beats
 both refit and persistence** on held-out blocks, and how it behaves when few blocks have been seen.
-**Status: REVIVED as a LOW-RANK normalizer (2026-10-03, `23`).** `19` killed a *portable* axis (random
-across sessions), but `23` shows the drift is **low-rank (PC1+2 = 0.80, ~2-D)** within a session — so a
-**k≈2–5 online normalizer estimated per session** is well-determined and worth building (the full-rank
-version in `21` failed only because it was under-determined).
+**Status: TESTED (2026-10-03, `25`) — MIXED.** The low-rank **landmark** normalizer **does NOT work**
+(lr2…lr7 all negative; full-rank catastrophic; drift is a deformation, not a rotation). But the simple
+**label-free moment re-match DOES help a little** (+10% of headroom: 0.303 vs frozen 0.288; refit bound
+0.446). → **the normalizer's value is moment-matching, not landmark rotation.** See
+`findings/2026-10-03_lowrank_normalizer.md`.
 
 ## Idea 9 — Is the **rotation axis stable across days**? **[next step b]**
 Re-estimate the within-session drift rotation per session and measure **axis consistency** across days
