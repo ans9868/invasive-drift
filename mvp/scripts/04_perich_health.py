@@ -72,7 +72,11 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     data = []
     for p in files:
-        X, y = load_session(p)
+        try:
+            X, y = load_session(p)
+        except Exception as exc:  # skip partial/unreadable files
+            print(f"  SKIP {date_of(p)}: {exc}")
+            continue
         X = exp_filt(X)
         X, y = valid(X, y)
         data.append((date_of(p), X, y))
