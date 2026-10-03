@@ -139,7 +139,10 @@ Procrustes landmark alignment HURTS** (R² 0.289 → 0.058; refit upper bound 0.
 (a) use ≫ d landmarks (per-trial / direction × phase), and (b) do the alignment **in a low-rank
 subspace** (estimate the rotation in the top-k PCs). This is the most promising remaining lead because
 the shared ~45% mode is real.
-**Status:** first pass done; redesign pending (see `findings/2026-10-03_manifold_motion_and_repeat.md`).
+**Status:** first pass done (`21`); **pairwise-gap follow-up (`22`) → NEGATIVE**: only 15% of unit pairs
+change monotonically, only 37% of *those* widen, median gap change ≈ 0, and extrapolation skill = −1.75.
+The change is **random, not a consistent widening** → not cornerable by extrapolation. See
+`findings/2026-10-03_pairwise_relations.md`. Remaining hope = **low-rank alignment** (fix, not forecast).
 
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;

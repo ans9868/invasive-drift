@@ -17,6 +17,9 @@ Dated finding notes from the invasive-drift MVP. One file per topic; newest date
 - `2026-10-03_manifold_motion_and_repeat.md` — **not a rigid moving object** → the drift is a
   **deformation** tracking the R² drop; the "piano" test shows a **shared wobble (PC1≈0.45)** but
   persistence beats rotation and naive landmark alignment **hurts**. (+ 2 concrete fixes)
+- `2026-10-03_pairwise_relations.md` — pairwise "gaps" between units **don't widen consistently**
+  (only 15% monotone; 37% of those widen; median change ≈ 0) and **extrapolation fails** (skill −1.75).
+  → within-session drift is a random walk at *every* level tested (state/axis/manifold/relations).
 - `2026-10-03_waveform_probe.md` — waveforms stable within-session; **cross-session matcher works**
   (corr≈0.996) → unit-identity instrument.
 - `2026-10-03_degradation_forecast.md` — rate/accel NOT forecastable at 53 sessions; only a modest
