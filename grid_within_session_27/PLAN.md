@@ -56,28 +56,102 @@ mse_bias2 · mse_var · lag_bins · r2_frozen · r2_refit`
 ang_resultant_R · speed_ratio · speed_corr · dir_acc8`
 **neural context (cheap, explains drift):** `rate_mean · rate_median · frac_silent · active_units ·
 mean_pairwise_corr · pc1_var · eff_dim · subspace_angle_deg`
+**task covariates (per window):** `speed_mean · moving_frac · dir_coverage` (n directions present)
+**ceiling anchors:** `r2_refit` (optimistic oracle) · `reliability` (split-half of TRUE kinematics)
+**overfit gap:** `r2_train · fit_time_s`
+**temporal:** `lag_bins` (pred−true cross-corr lag) · `metric_slope_over_windows`
+**cross-decoder agreement / uncertainty:** `pred_corr_mean` (pairwise across decoders on the same rows) ·
+`ens_disagree` (std across decoders) · `err_corr_mean` (are the ERRORs aligned?) · `r2_consensus`
+**KF self-uncertainty:** `kf_post_var_mean` · `kf_post_var_growth` (posterior covariance over the window)
+**non-neural baselines (anchor the R² scale):** `r2_persist` (v_t ≈ v_{t−1}) · `r2_mean` (const) ·
+`r2_target` (mean velocity for the cued direction)
 **correction size:** `||T-I||_F · det(T) · median|scale-1| · rank(T) · n_params`
 **diagnostics:** `obj_value · align_score · drift_energy_rowspace · drift_energy_nullspace`
 **LR-2 (trainable only):** `epochs_run · loss_init · loss_final · loss_slope · grad_norm_mean/max ·
 early_stopped · degenerate_fit · fit_time_s · r2_burnin`
-**flags:** `degenerate · skipped · n_eval_samples`
+**flags:** `degenerate · skipped · n_eval_samples · **eval_contiguous** (bool)`
+**CI policy:** CIs are computed **at analysis time** by grouping the per-window rows (never collapse
+in-pipeline).
 **Storage:** Tier A table (~110k rows, few MB) — **keep all**; Tier B raw trajectories → leaders only.
+
+> `lag_bins` is **only valid when `eval_contiguous == True`** (eval rows form one contiguous time block,
+> as in the current design). Never interpret a lag from a shuffled/random eval split.
+
+## 5b. Metric definitions (LOCKED — Block 1, first grid search)
+Notation: `y` = true velocity `(n,2)`, `ŷ` = prediction, on the **eval rows only**; `moving` = rows with
+speed above the 60th percentile; `Δθ` = angle wrap of `θ̂ − θ` into `[−180°, 180°)`.
+
+**Velocity**
+- `r2_all = 1 − Σ‖ŷ−y‖² / Σ‖y−ȳ‖²` (pooled); `r2_vx`, `r2_vy` = same per dimension.
+- `corr_vx/vy` = Pearson(pred, true) per dimension.
+- `mse = mean_rows Σ_d (ŷ−y)²`; `bias_vx/vy = mean(ŷ−y)`.
+- `slope_vx/vy` = OLS slope of **true on predicted** (gain), per dimension.
+- `mse_bias2 = ‖mean_rows(ŷ−y)‖²`; `mse_var = mean_rows ‖(ŷ−y) − mean(ŷ−y)‖²`
+  → **identity: `mse = mse_bias2 + mse_var`** (verified in the selftest).
+- `lag_bins = argmax_{l∈[−20,20]} corr(ŷ_t, y_{t+l})`; **positive ⇒ the output lags the truth**.
+- `r2_frozen`, `r2_refit` — computed by the harness on the **same** eval rows.
+
+**Direction / speed** (on `moving` rows)
+- `θ = atan2(y_y, y_x)`, `θ̂ = atan2(ŷ_y, ŷ_x)`.
+- `ang_bias_deg = deg( atan2(mean sin Δθ, mean cos Δθ) )` — the **systematic rotation** (drift signature).
+- `ang_err_mean_deg = mean |Δθ|`; `ang_abs_err_deg = median |Δθ|` (robust).
+- `ang_resultant_R = |mean e^{iΔθ}|` (concentration); `circ_std_deg = deg( sqrt(−2 ln R) )`.
+- `speed_ratio = median( |ŷ| / (|y|+ε) )`; `speed_corr = Pearson(|ŷ|, |y|)`.
+- `dir_acc8` = accuracy of binning `θ̂` into 8 target bins vs `θ`'s bin (**velocity-derived**
+  correspondence → flagged).
+
+**Neural context** (per window, from `cache.py`)
+- `rate_mean`, `rate_median` (Hz over units), `frac_silent` (rate < 0.5 Hz), `active_units`.
+- `mean_pairwise_corr` = mean off-diagonal pairwise correlation of unit rate vectors
+  (**subsample 1500 fit-pool rows, fixed seed**).
+- `pc1_var` = variance fraction of PC1; `eff_dim = (Σλ)² / Σλ²` (participation ratio).
+- `subspace_angle_deg` = mean principal angle between the window's top-k PCA subspace and the reference.
+- `speed_mean`, `moving_frac`, `dir_coverage` = # direction bins with ≥ 20 samples.
+
+**Ceiling / overfit**
+- `r2_refit` = decoder fit on the **eval** rows (optimistic oracle).
+- `reliability` = **unit split-half** decoding ceiling: split units randomly in half, fit ridge per half on
+  the fit pool, predict eval, correlate the two predictions (mean over vx,vy).
+- `r2_train` = R² of the frozen decoder on the **fit pool**; `fit_time_s`.
+
+**Agreement / uncertainty** (computed per **adapter × window**, **across the 5 decoders**, then broadcast)
+- `pred_corr_mean` = mean over decoder pairs of corr(pred_A, pred_B) on eval.
+- `ens_disagree` = mean over rows of std across decoders (per dimension, then averaged).
+- `err_corr_mean` = mean over decoder pairs of corr(err_A, err_B), `err = pred − true`
+  (**high ⇒ the models fail the same way = common cause**).
+- `r2_consensus` = R² of the mean-across-decoders prediction.
+- `kf_post_var_mean` = mean_t trace(P_t); `kf_post_var_growth` = slope of trace(P_t) over the window.
+
+**Non-neural baselines** (need only true velocity + `dirbin`)
+- `r2_mean` (predict the fit-pool mean) — the 0 floor.
+- `r2_persist_lag1` (ŷ_t = y_{t−1}) **and** `r2_persist_lag12` (ŷ_t = y_{t−12}, ≈240 ms) — **both**.
+- `r2_target` = R² of predicting the **reference mean velocity of the row's direction bin**;
+  **flagged `target_src="velocity_bin"`** (mildly self-referential; not a trial target).
 
 ## 6. Aggregate OUT of that table (never collapse in-pipeline)
 median+IQR · mean+SD · **p10 (worst window)** · late-session R² · slope over windows ·
 frac-of-sessions-improving · **fail fraction** · bimodality check.
 
-## 7. Execution order (tracer bullet first)
-| phase | deliverable | script |
-|---|---|---|
-| **P0** | skeleton, `config.yaml`, shared utils | — |
-| **P1** | `adapters/` library + unit tests | `adapters/*.py` |
-| **P2** | cached decoders + reference + splits | `cache.py` |
-| **P3** | sufficient stats → transforms | `fit.py` |
-| **P4** | apply + R² → long row | `evaluate.py` |
-| **P5** | trainable adapters + LR-2 | `trainable.py` |
-| **P6** | per-decoder cards, curves, racing | `analyze.py` |
-| **P7** | row-space + alignment diagnostics | `fit.py` / `analyze.py` |
+## 7. Execution order (tracer bullet first) — with checkpoint **BLOCKS**
+> **Blocks** are discussion gates: we stop, look, and agree before proceeding.
+
+| step | deliverable | script | gate |
+|---|---|---|---|
+| **Block 1** | lock metric definitions (§5b) + grid axes | — | ✅ done |
+| **P0** | skeleton, `config.json` | — | ✅ done |
+| **P1** | `adapters/` library + `selftest.py` (ALL PASS) | `adapters/*.py` | ✅ done |
+| **P2-tracer** | cache 1 session | `cache.py --n 1` | ✅ done |
+| **Step 0.5** | `metrics.py` + `selftest_metrics.py` + per-window context in `cache.py` + KF `trace(P)` + smoke update → re-run smoke | new | **Block 2** |
+| **Step 0** | non-neural baselines (`r2_persist*`, `r2_mean`, `r2_target`) vs ridge, 53 sessions | `baselines.py` | **Block 3** |
+| **P2-scale** | cache all 53 sessions | `cache.py --n 0` | — |
+| **P3** | sufficient stats → transforms | `fit.py` | — |
+| **P4** | apply + full metric row (incl. agreement, KF, direction) | `evaluate.py` | — |
+| **P5** | trainable adapters + LR-2 | `trainable.py` | — |
+| **P6** | per-decoder cards, curves, racing, CIs | `analyze.py` | **Block 4** |
+| **P7** | row-space + alignment diagnostics | `fit.py` / `analyze.py` | — |
+
+**Block 3 decides the headline metric:** if `r2_persist*` ≫ decoder R², we switch from raw R² to
+**skill-over-persistence** (`Δskill`, `R²_innovation`) **before** building P3/P4.
 
 **Widening:** 1 → 3 → 10 → 53 sessions; ridge → +linear → +MLP/KF → +GRU; N=1 → full sweep.
 

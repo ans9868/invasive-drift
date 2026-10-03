@@ -172,9 +172,37 @@ One network predicting velocity *and* direction jointly (shared trunk, two heads
 targets share drift structure, and whether the direction head acts as a regulariser for velocity.
 **Status:** later; needs a trainable decoder family + the direction head from Idea 12.
 
+## Idea 14 — Cross-decoder **uncertainty / agreement** **[from discussion]**
+We already run all 5 decoders on the *same* eval rows → agreement is nearly free.
+- **Epistemic:** `pred_corr_mean` (pairwise prediction correlation), `ens_disagree` (std across decoders),
+  `r2_consensus` (does the ensemble beat any single decoder?).
+- **Are the ERRORS aligned?** `err_corr_mean` — high ⇒ the models fail the *same way* (a common cause =
+  the drift); low ⇒ idiosyncratic model noise.
+- **KF posterior covariance is native** → does the filter's *own* uncertainty grow with drift? A classic
+  early-warning signal we have never looked at.
+**Hypothesis:** disagreement grows as drift accumulates and may **lead** the R² drop → an **unsupervised**
+early warning (no labels).
+**Cost:** ~free (predictions already computed). A within-decoder bootstrap ensemble would cost ~B×.
+**Status:** metrics recorded as columns; the *test* (trend + lead/lag) is an analysis step.
+
+## Idea 15 — **Non-neural baselines** / skill-over-persistence **[from discussion — DO EARLY]**
+- `r2_mean` (constant → the 0 floor) · `r2_persist` (`v_t ≈ v_{t-1}`) · `r2_target` (mean velocity for the
+  cued direction — task structure only).
+- **Risk this exposes:** velocity is binned at **20 ms** and smoothed, so it is *highly autocorrelated* —
+  persistence may already reach **R² ≈ 0.9+**, in which case our decoders' raw R² (0.36 / 0.61) may be
+  **worse than doing nothing**, and **raw R² is a misleading metric**. This is the same trap we hit in
+  `13` (the historical-slope was the real baseline and ate the apparent skill).
+- **Fix if true:** re-express everything as **skill over persistence** — `R²_innovation` (R² on the
+  residual after persistence) or `Δskill = R²_ours − R²_persist`. The **margin over persistence** may also
+  be a *better* drift signal than raw R².
+- **Caveat:** offline persistence uses the **true** previous velocity (a closed-loop BCI only has the
+  *decoded* previous output) → an **optimistic anchor**, not a fair competitor.
+**Status:** compute **Stage 0, before P3/P4** — it anchors the interpretation of every other number.
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
 the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11;
-direction head is Idea 12; multi-task is Idea 13. Revisit order: 7-redesign (≫d points) →
-10-redesign (low-rank alignment) → 6 (Perich proxy) → 8. **9 is closed (negative).***
+direction head is Idea 12; multi-task is Idea 13; uncertainty is Idea 14; non-neural baselines is Idea 15.
+Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment) → 6 (Perich proxy) → 8.
+**9 is closed (negative).***
 
