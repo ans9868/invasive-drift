@@ -33,6 +33,7 @@ def exp_filt(x, tau_ms=TAU_MS, bin_ms=BIN_MS):
 
 
 def cosv(a, b):
+    a = np.asarray(a).ravel(); b = np.asarray(b).ravel()
     return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12))
 
 
@@ -107,10 +108,13 @@ def main():
             Am = Ridge(alpha=1.0).fit(state[:b], steps).coef_
             preds["state"] = W[b] + (state[b:b + 1] @ Am.T) @ P.T
             for m in MODELS:
-                cos[m].append(cosv(preds[m], truth))
+                pv = np.asarray(preds[m]).ravel()
+                if pv.size != truth.size:
+                    print("SHAPE_WARN", m, np.shape(preds[m]), truth.shape); continue
+                cos[m].append(cosv(pv, truth))
                 # functional: decode NEXT block with predicted decoder (block-b scaling)
                 Xn = (XB[b + 1] - MB[b]) / SB[b]
-                w2 = preds[m].reshape(2, Xn.shape[1])   # (vx,vy) rows from raveled coef_
+                w2 = pv.reshape(2, Xn.shape[1])   # (vx,vy) rows from raveled coef_
                 fun[m].append(r2(Xn @ w2.T, VB[b + 1]))
         print(f"  {os.path.basename(p).split('ses-')[1].split('_')[0]}: nb={len(W)}")
     print(f"\nN={len(cos['persist'])} block-predictions across sessions")
