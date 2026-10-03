@@ -146,7 +146,7 @@ def main():
             print(f"    {k_:14s}: n/a"); continue
         r_, p_ = spearmanr(v_[msk], np.asarray(rate)[msk])
         print(f"    {k_:14s}: rho={r_:+.3f} p={p_:.3f} (n={msk.sum()})")
-    dd = np.array([r_[4] for r in rows]); durs = np.array([r[3] for r in rows]); nu = np.array([r[1] for r in rows])
+    dd = np.array([rw[4] for rw in rows]); durs = np.array([rw[3] for rw in rows]); nu = np.array([rw[1] for rw in rows])
     print(f"    [diag] |driftV| vs duration: rho={spearmanr(durs, dd)[0]:+.3f}"
           f" | vs n_units: rho={spearmanr(nu, dd)[0]:+.3f}")
     print(f"\n[resources] loop={t_loop:.1f}s total={time.time()-t_start:.1f}s "
