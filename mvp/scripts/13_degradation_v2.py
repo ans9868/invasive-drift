@@ -60,10 +60,16 @@ def smoother_known(z, sig, t, q=(1e-5, 1e-6)):
 
 
 def block_sigma(dec, Xb, vb):
-    """split block in 4; R2 per quarter; sigma = std/sqrt(4)."""
+    """split block in 4; R2 per quarter (aligned past MLP lag); sigma = std/sqrt(nq)."""
     k = len(vb) // 4
-    vals = [r2(vb[i * k:(i + 1) * k], dec.predict(Xb[i * k:(i + 1) * k])) for i in range(4)]
-    return max(1e-3, float(np.std(vals) / np.sqrt(4)))
+    vals = []
+    for i in range(4):
+        Xq = Xb[i * k:(i + 1) * k]; vq = vb[i * k:(i + 1) * k]
+        if len(vq) < 60:
+            continue
+        P = dec.predict(Xq)
+        vals.append(r2(vq[-len(P):], P))
+    return max(1e-3, float(np.std(vals) / np.sqrt(max(1, len(vals)))))
 
 
 def session_series(path, block_s, ref_frac):
