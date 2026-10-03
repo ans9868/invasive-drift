@@ -20,6 +20,9 @@ Dated finding notes from the invasive-drift MVP. One file per topic; newest date
 - `2026-10-03_pairwise_relations.md` — pairwise "gaps" between units **don't widen consistently**
   (only 15% monotone; 37% of those widen; median change ≈ 0) and **extrapolation fails** (skill −1.75).
   → within-session drift is a random walk at *every* level tested (state/axis/manifold/relations).
+- `2026-10-03_lowrank_gate_and_volatility.md` — **low-rank gate PASSES** (drift PC1+2 = 0.80, ~2-D →
+  a low-rank normalizer has a real shot); **volatility fails** (lag-1 autocorr 0.04 → memoryless, and
+  does **not** lead the R² drop) → the entropy/early-warning route is closed.
 - `2026-10-03_waveform_probe.md` — waveforms stable within-session; **cross-session matcher works**
   (corr≈0.996) → unit-identity instrument.
 - `2026-10-03_degradation_forecast.md` — rate/accel NOT forecastable at 53 sessions; only a modest
