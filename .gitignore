@@ -24,3 +24,6 @@ temp-trash/
 
 # Research PDFs + extracted text (copyrighted; never commit)
 research-papers/
+
+# Scratch analysis workspace (never commit)
+temp-analysis/

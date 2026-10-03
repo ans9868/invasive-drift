@@ -100,3 +100,35 @@ Also flagged: P2's two members differ in **label use** — `subspace` is clean (
    Verified after the fix: tracer emitted **260 rows x 73 cols**, `L3_COL_CHECK: PASS`, zero `[FAIL]`,
    and on REAL data `r2_vw = 0.30065293128765525` vs `r2_all = 0.30065293128766213` -- the identity
    confirmed to 14 s.f.
+
+## Progress log 6 (the grid RUN — 2026-10-03)
+**`results/raw/` now holds 53 CSVs: 53 sessions x 5 decoders x 13 objectives x 4 N = 13,780 rows x 73 cols.**
+Every task `rc=0`. Runtime 82-414 s/session (scales with session length).
+
+**Precondition discovered first:** `artifacts/perich_subC/` held only **1** npz. The 53 npz in
+`temp-trash/` are the OLD window-based **v2** artifacts (no `gfit_mask`/`geval_mask`) — incompatible with
+`run_grid`, and deliberately NOT restored. So the v3 cache had to be rebuilt: `cache.sbatch` job
+`19122022` — 53/53, all rc=0, 1 SKIP (a pre-existing session).
+
+**The grid took three submissions, because of ONE real failure mode:**
+| job | array | outcome |
+|---|---|---|
+| `19122448` | 1-53 | 51 done; **tasks 11,12,13,14 `OUT_OF_MEMORY`**; tasks 8,10 stalled >1 h |
+| `19123740` | 11,12,13,14 | **all rc=0** (347-414 s) |
+| `19123956` | 8,10 | **all rc=0** (103.8 s, 390.2 s) |
+
+**The failure and the fix:**
+- `sacct`: `State=OUT_OF_MEMORY`, `ExitCode 0:125`, on **three different nodes** (cs647 x2, cs603, cl017).
+  The victims were exactly the **4 largest sessions** by npz size (76/86/87/80 MB) vs 9.8 MB for one that
+  completed fine. Tasks 8 and 10 (8.9 MB and 57 MB) did not die — they became pathologically SLOW.
+- **`--mem 4G -> 16G`** (user decision), plus **`TMPDIR`/`TMP`/`TEMP` -> `$SCRATCH/invasive-drift/tmp`** in
+  all three sbatch files. Both landed together, so they are **not separately attributed**.
+- Note: the login-node `/tmp` is a **6 GB tmpfs at 100% full**, but **compute nodes have their own tmpfs**,
+  so that failure and these OOMs are probably UNRELATED. `TMPDIR` arrived **unset** because
+  `export_paths.sh` is not sourced in non-interactive shells (its last line `TMPDIR=$SCRATCH` is missing
+  `export`). Tasks now log `node=`/`cpus=`/`TMPDIR=` so this is diagnosable next time.
+
+**Process lesson (recorded deliberately):** on the first `OUT_OF_MEMORY` the correct move was to STOP and
+report, not to keep diagnosing with more commands. Also `pkill -f` is broad-scope and forbidden by
+WORKFLOW §2 — it matched my own ssh command lines. Agreed rhythm: **agree a task set -> execute -> if it
+fails, come back and decide the fix together.**
