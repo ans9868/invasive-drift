@@ -67,6 +67,9 @@ nonstationarity.
   /5 with who/what/why/how/results blurbs): sources, instability measurement, decomposition, drift
   mitigation, population/representational drift, datasets/benchmarks, ephys QC, decoders/forecasting.
   Ends with the **gaps** (no forecasting paper, no ephys decomposition paper, no chronic-motor Neuropixels).
+- `17_plan_27_adapter_curves.md` — **PLAN** for experiment `27`: an **adapter grid × adaptation-data
+  learning curves** (labeled vs unlabeled, with complexity/params), replacing the earlier fixed-window
+  comparison. Key idea: for **unlabeled** adapters data is *free*, so a data-hungry one is a win.
 
 ## One-line takeaway
 The decomposition is the forecast note's slowest clock (an integral vs a derivative). They can be
