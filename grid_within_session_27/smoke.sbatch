@@ -4,7 +4,7 @@
 #SBATCH --partition=cpu_short
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=4G
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --output=/scratch/ans9868/invasive-drift/logs/id_smoke_%j.out
 #SBATCH --error=/scratch/ans9868/invasive-drift/logs/id_smoke_%j.err
 set -uo pipefail
@@ -21,4 +21,21 @@ echo "=== L1c selftest (common.evaluate_cell) ==="
 "$E" grid_within_session_27/selftest_common.py
 echo "=== L2 tracer (cache 1 session + decoders) ==="
 "$E" grid_within_session_27/cache.py --n 1 --with-decoders
+echo "=== L3 tracer (run_grid 1 session x 5 decoders x 13 adapters x 4 N) ==="
+"$E" grid_within_session_27/run_grid.py --sessions 1
+echo "=== L3c: new pre-run columns present? ==="
+"$E" - <<'PY'
+import csv, glob
+fs = sorted(glob.glob("results/raw/*.csv"))
+if not fs:
+    print("  *** NO tracer CSV WRITTEN ***")
+else:
+    r = next(csv.DictReader(open(fs[0])))
+    want = ["r2_vw", "r2_all", "form", "label_use", "aligned", "causal",
+            "refit_available", "r2_burnin_in", "r2_burnin_out", "eval_contiguous"]
+    for k in want:
+        v = r.get(k, None)
+        print("  %-18s = %s" % (k, "*** MISSING ***" if v is None else v))
+    print("  n_cols = %d   file = %s" % (len(r), fs[0]))
+PY
 echo ID_SMOKE_DONE
