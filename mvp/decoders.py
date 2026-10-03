@@ -84,3 +84,56 @@ class KalmanDec:
             x = x + K @ (Z[t] - x); P = (I - K) @ P
             out[t] = x[2:4] if self.mode == "posvel" else x[0:2]
         return out
+
+
+# ---- recurrent (GRU) decoder (torch) ----
+try:
+    import torch
+    import torch.nn as nn
+
+    class _GRUNet(nn.Module):
+        def __init__(self, n_in, hidden=64):
+            super().__init__()
+            self.gru = nn.GRU(n_in, hidden, batch_first=True)
+            self.fc = nn.Linear(hidden, 2)
+        def forward(self, x):
+            o, _ = self.gru(x)
+            return self.fc(o[:, -1])
+    _HAS_TORCH = True
+except Exception:
+    _HAS_TORCH = False
+
+
+def _windows(X, L):
+    T, n = X.shape
+    idx = np.arange(L)[None, :] + np.arange(T - L)[:, None]
+    return X[idx]
+
+
+class GRUDec:
+    """Recurrent (GRU) decoder over a sliding window of L bins."""
+    def __init__(self, L=10, hidden=64, epochs=4, bs=512, lr=1e-3):
+        self.L = L; self.hidden = hidden; self.epochs = epochs; self.bs = bs; self.lr = lr
+        self.name = f"gru_L{L}"
+    def fit(self, X, y):
+        import torch, torch.nn as nn
+        torch.manual_seed(0)
+        self.m = X.mean(0); self.s = X.std(0) + 1e-6
+        Xw = _windows(((X - self.m) / self.s).astype("float32"), self.L)
+        yw = y[self.L:].astype("float32")
+        self.net = _GRUNet(X.shape[1], self.hidden)
+        opt = torch.optim.Adam(self.net.parameters(), lr=self.lr)
+        lossf = nn.MSELoss()
+        Xt = torch.from_numpy(Xw); Yt = torch.from_numpy(yw); N = len(Xt)
+        for _ in range(self.epochs):
+            perm = torch.randperm(N)
+            for i in range(0, N, self.bs):
+                b = perm[i:i + self.bs]
+                opt.zero_grad(); loss = lossf(self.net(Xt[b]), Yt[b]); loss.backward(); opt.step()
+        return self
+    def predict(self, X):
+        import torch
+        Xw = _windows(((X - self.m) / self.s).astype("float32"), self.L)
+        self.net.eval()
+        with torch.no_grad():
+            return self.net(torch.from_numpy(Xw)).numpy()
