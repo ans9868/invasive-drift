@@ -17,3 +17,6 @@ results/
 
 # OS
 .DS_Store
+
+# Safety: moved-here instead of deleted (see WORKFLOW.md — never `rm`)
+trash/
