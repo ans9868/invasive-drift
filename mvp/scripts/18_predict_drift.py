@@ -110,7 +110,8 @@ def main():
                 cos[m].append(cosv(preds[m], truth))
                 # functional: decode NEXT block with predicted decoder (block-b scaling)
                 Xn = (XB[b + 1] - MB[b]) / SB[b]
-                fun[m].append(r2(Xn @ preds[m], VB[b + 1]))
+                w2 = preds[m].reshape(2, Xn.shape[1])   # (vx,vy) rows from raveled coef_
+                fun[m].append(r2(Xn @ w2.T, VB[b + 1]))
         print(f"  {os.path.basename(p).split('ses-')[1].split('_')[0]}: nb={len(W)}")
     print(f"\nN={len(cos['persist'])} block-predictions across sessions")
     print(f"{'model':8s}  {'cos(next w)':>11s}  {'functional R2':>13s}")
