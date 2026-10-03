@@ -13,6 +13,8 @@ cd /scratch/ans9868/invasive-drift
 E=/scratch/ans9868/conda_storage/kalman/bin/python
 echo "=== L0 selftest (adapters) ==="
 "$E" adapters/selftest.py
+echo "=== L0 selftest (metrics) ==="
+"$E" grid_within_session_27/selftest_metrics.py
 echo "=== L2 tracer (cache 1 session) ==="
 "$E" grid_within_session_27/cache.py --n 1
 echo ID_SMOKE_DONE

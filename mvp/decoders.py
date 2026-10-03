@@ -73,16 +73,23 @@ class KalmanDec:
         self.R = np.atleast_2d(np.cov((Z - Zhat).T)) + np.eye(n) * 1e-6
         self.W = np.atleast_2d(np.cov((Z[1:] - Z[:-1] @ A.T).T)) + np.eye(n) * 1e-6
         self.x0 = Z.mean(0); self.P0 = np.eye(n)
+        self.traceP = None                      # optional recorder (non-breaking)
+        self.record_trace = False
         return self
     def predict(self, X):
         n = self.n; A = self.A; I = np.eye(n)
         Z = (X - self.Xm) / self.Xs @ self.C + self.c0
         x = self.x0.copy(); P = self.P0.copy(); out = np.zeros((len(X), 2))
+        tr = np.zeros(len(X)) if self.record_trace else None
         for t in range(len(X)):
             x = A @ x; P = A @ P @ A.T + self.W
             K = P @ np.linalg.inv(P + self.R)
             x = x + K @ (Z[t] - x); P = (I - K) @ P
             out[t] = x[2:4] if self.mode == "posvel" else x[0:2]
+            if tr is not None:
+                tr[t] = np.trace(P)
+        if tr is not None:
+            self.traceP = tr
         return out
 
 

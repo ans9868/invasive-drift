@@ -97,10 +97,38 @@ def build(path, cfg):
         fit_mask[w, ii[:cut]] = True
         eval_mask[w, ii[cut:]] = True
     valid_w = (fit_mask.sum(1) >= cfg["min_fit_samples"]) & (eval_mask.sum(1) >= 100)
+    # ---- per-window CONTEXT (computed ONCE per window; broadcast to every cell) ----
+    speed = np.linalg.norm(vel, axis=1)
+    moving = speed > np.nanpercentile(speed, 60)
+    bin_s = cfg["bin_ms"] / 1000.0
+    ctx_names = ["rate_mean", "rate_median", "frac_silent", "active_units", "mean_pairwise_corr",
+                 "pc1_var", "eff_dim", "subspace_angle_deg", "speed_mean", "moving_frac", "dir_coverage"]
+    ctx = np.full((W, len(ctx_names)), np.nan, np.float32)
+    rngc = np.random.default_rng(cfg.get("seed", 0))
+    for w in range(W):
+        rows = np.where(fit_mask[w])[0]
+        if len(rows) < cfg["min_fit_samples"]:
+            continue
+        rate = X[rows].mean(0) / bin_s                       # Hz per unit
+        Zw = Z[rows] - Z[rows].mean(0)
+        Vw, Sw, _ = np.linalg.svd(Zw, full_matrices=False)
+        e = Sw ** 2
+        Pw = Vw[:, :min(k, Vw.shape[1])]
+        cosang = np.linalg.svd(Pw.T @ P, compute_uv=False)
+        sub = Zw[rngc.choice(len(Zw), size=min(1500, len(Zw)), replace=False)]
+        C = np.corrcoef(sub, rowvar=False)
+        off = C[np.triu_indices_from(C, 1)]
+        sp = speed[rows]; db = dirbin[rows]
+        ctx[w] = [rate.mean(), np.median(rate), float((rate < 0.5).mean()), float((rate >= 0.5).sum()),
+                  float(np.nanmean(off)), float(e[0] / e.sum()), float((e.sum() ** 2) / (e ** 2).sum()),
+                  float(np.degrees(np.mean(np.arccos(np.clip(cosang, -1, 1))))),
+                  float(sp.mean()), float(moving[rows].mean()),
+                  float(sum((db == kk).sum() >= cfg["min_dir_samples"] for kk in range(K)))]
     return dict(Z=Z, vel=vel, pos=pos, ts=ts, burnin=bm, dirbin=dirbin.astype(np.int16),
                 mu0=Z[bm].mean(0), sd0=Z[bm].std(0) + 1e-6, C0=C0, C0k=C0k, P=P, Zref=Z[bm],
                 dirC=dirC, dirOK=dirOK, v_mu0=vbm.mean(0), v_cov0=np.cov(vbm, rowvar=False) + 1e-6 * np.eye(2),
                 m0=m0, s0=s0, fit_mask=fit_mask, eval_mask=eval_mask, valid_w=valid_w,
+                ctx=ctx, ctx_names=np.array(ctx_names),
                 n_units=d, dur=dur), (W, int(valid_w.sum()))
 
 
