@@ -24,9 +24,17 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
 
 ## Log
 
-- **#1 DONE** (`08_within_forecast.py`, job 19097685, 7 sessions / 52 rows). Rich features
-  (`rate, act, rate_std, corr, mse, rate_cv, drate`) → **panel 0.570 > trend 0.515 > persistence 0.482**;
-  **ΔR² over trend = +0.055 (was −0.091)**. But: panel **corr (0.757) < trend corr (0.779)** (R² gain is
-  level/bias, not tracking); **detrended still fails (−1.18)**; **n=52 too thin**. → *tentative positive*.
-- **#2 IN PROGRESS:** download all sub-C (53) + other subjects → more rows → re-run the ladder to test
-  whether +0.055 survives. (Download running; ~18/53 sessions in.)
+- **#1 DONE** (`08_within_forecast.py`, job 19097685). Rich features → **panel 0.570 > trend 0.515 >
+  persistence 0.482**; ΔR² over trend **+0.055** (was −0.091). Caveats: corr *worse* than trend
+  (0.757 vs 0.779), detrended fails, n=52 → *tentative*.
+- **#2 DONE.** Downloaded **all 53 sub-C CO sessions** (~2.6 GB).
+- **Decoder zoo DONE** (`09_decode_zoo.py`, job 19100558, N=53, train-80%/test-last-20%):
+  `gru 0.607 | mlp 0.576 | wiener 0.404 | kf_posvel 0.393 | kf_vel 0.383 | ridge 0.357` (mean R²).
+  - nonlinear ≫ linear; `kf_posvel ≥ kf_vel` (Gilja #2) in ~all sessions; Wiener > ridge.
+  - range 0.03–0.88 (session-quality driven). In the published M1 ballpark.
+  - **Decoder of record = `gru` (or `mlp`)** for the degradation-prediction phase.
+- **NEXT PHASE — predict degradation.** Two target framings:
+  - **rate of degradation**: regress the within-session `health(t)` slope (and/or cross-session slope);
+  - **large degradations**: predict "crash" events (a block/boundary where R² falls sharply).
+  Keep the bias ladder (`drafts/13`): chance → persistence → **trend** → panel, on detrended targets.
+- (#3 accept-negative, #4 cross-session matching) remain open.
