@@ -160,6 +160,11 @@ def main():
         print(f"  {sess}: units={art['n_units']} T={len(art['ts'])} dur={art['dur']/60:.1f}min "
               f"burnin={int(art['burnin'].sum())} windows_valid={nv}/{W} "
               f"dirs_ok={int(art['dirOK'].sum())} ({time.time()-t1:.1f}s)")
+        wv = np.where(art["valid_w"])[0]
+        if len(wv):
+            i0 = int(wv[0])
+            print("    ctx[%d]: " % i0 + "  ".join(
+                f"{nm}={art['ctx'][i0, i]:.3g}" for i, nm in enumerate(art["ctx_names"])))
     print(f"[resources] total={time.time()-t0:.1f}s "
           f"peakRSS={resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024:.0f} MB")
     print("CACHE_DONE")
