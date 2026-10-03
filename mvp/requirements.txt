@@ -6,3 +6,4 @@ pandas
 pynwb
 h5py
 dandi
+torch
