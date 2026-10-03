@@ -146,8 +146,19 @@ change monotonically, only 37% of *those* widen, median gap change ≈ 0, and ex
 The change is **random, not a consistent widening** → not cornerable by extrapolation. See
 `findings/2026-10-03_pairwise_relations.md`. Remaining hope = **low-rank alignment** (fix, not forecast).
 
+## Idea 11 — Cross-session **meta-learned adapter** (SS2) **[later — cross-session track]**
+Learn the *adapter* on **other sessions** (labels allowed there — they're calibration sessions), then apply
+it to a new session with **zero labels at test time**. This is the strongest realistic label-*free-at-test*
+solution and the **proper home for a "deep / FALCON-class" model** (the adapter, not the decoder).
+- Distinguish clearly: **test-time adaptation** (`27`) vs **transfer/meta-learned adaptation** (this idea).
+- Needs the cross-session machinery: a **common unit set** or the **waveform unit matcher** (Idea 1/3).
+- Sits next to the alignment literature (Degenhart 2020, NoMAD) but with the *forecasting/failure* twist.
+- **Compute plan:** train on N−1 sessions, evaluate on the held-out one (leave-one-session-out).
+**Status:** deferred until the cross-session track; recorded here so it is not lost.
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
-the "moving manifold" idea is Idea 7; the "piano" is Idea 10. Revisit order: 7-redesign (≫d points) →
-10-redesign (low-rank alignment) → 6 (Perich proxy) → 8. **9 is closed (negative).***
+the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11.
+Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment) → 6 (Perich proxy) → 8.
+**9 is closed (negative).***
 

@@ -1,5 +1,8 @@
 # 17 — PLAN for experiment `27`: adapter grid × adaptation-data learning curves
 
+> **SUPERSEDED** by the authoritative plan at **`grid_within_session_27/PLAN.md`**.
+> This file is kept as the **discussion trail** (how the design evolved). Read `PLAN.md` first.
+
 **Status:** PLAN ONLY (no code yet). Supersedes the earlier fixed-window idea for `27`.
 **Depends on:** `25_lowrank_normalizer.py`, `26_perspective_normalizer.py` (results below).
 **Related:** `drafts/ideas.md` (Idea 8), `findings/2026-10-03_lowrank_normalizer.md`,
