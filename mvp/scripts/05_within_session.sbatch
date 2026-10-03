@@ -8,6 +8,7 @@
 #SBATCH --output=/scratch/ans9868/invasive-drift/logs/id_win_%j.out
 #SBATCH --error=/scratch/ans9868/invasive-drift/logs/id_win_%j.err
 set -uo pipefail
+export PYTHONUNBUFFERED=1
 cd /scratch/ans9868/invasive-drift
 E=/scratch/ans9868/conda_storage/kalman/bin/python
 "$E" mvp/scripts/05_within_session.py "$@"
