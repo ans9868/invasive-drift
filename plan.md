@@ -24,4 +24,9 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
 
 ## Log
 
-- (#1) in progress: `mvp/scripts/08_within_forecast.py` (rich features) — see runs below.
+- **#1 DONE** (`08_within_forecast.py`, job 19097685, 7 sessions / 52 rows). Rich features
+  (`rate, act, rate_std, corr, mse, rate_cv, drate`) → **panel 0.570 > trend 0.515 > persistence 0.482**;
+  **ΔR² over trend = +0.055 (was −0.091)**. But: panel **corr (0.757) < trend corr (0.779)** (R² gain is
+  level/bias, not tracking); **detrended still fails (−1.18)**; **n=52 too thin**. → *tentative positive*.
+- **#2 IN PROGRESS:** download all sub-C (53) + other subjects → more rows → re-run the ladder to test
+  whether +0.055 survives. (Download running; ~18/53 sessions in.)
