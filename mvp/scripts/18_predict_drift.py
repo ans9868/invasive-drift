@@ -92,21 +92,22 @@ def main():
             # PC subspace of the historical weights (shared by low-rank models)
             mean_h = W[:b].mean(0)
             _, _, Vt = svd(W[:b] - mean_h, full_matrices=False)
-            kk = min(args.k, Vt.shape[0]); P = Vt[:kk].T                # dim x kk
-            to_pc = lambda A_: (A_ - mean_h) @ P                        # (n,dim)->(n,kk)
-            from_pc = lambda Z: Z @ P.T + mean_h                        # (n,kk)->(n,dim)
-            # low-rank rotation in PC subspace
+            kk = max(1, min(args.k, Vt.shape[0])); P = Vt[:kk].T          # dim x kk
+            mat = np.atleast_2d
+            to_pc = lambda a: mat(a - mean_h) @ P                        # (n,dim)->(n,kk)
+            from_pc = lambda z: (mat(z) @ P.T + mean_h)[0]               # (n,kk)->(dim,)
+            # low-rank orthogonal rotation in PC subspace
             Rk = procrustes(to_pc(W[:b]), to_pc(W[1:b + 1]))
-            preds["rot_lr"] = from_pc(to_pc(W[b:b + 1]) @ Rk)[0]
-            # VAR in PC subspace: z_{i+1} ~ A z_i
-            A = Ridge(alpha=1.0).fit(to_pc(W[:b]), to_pc(W[1:b + 1])).coef_
-            preds["var"] = from_pc(to_pc(W[b:b + 1]) @ A.T)[0]
+            preds["rot_lr"] = from_pc(to_pc(W[b:b + 1]) @ Rk)
+            # VAR in PC subspace: z_{i+1} ~ A z_i (least-squares -> deterministic shapes)
+            A = np.linalg.lstsq(to_pc(W[:b]), to_pc(W[1:b + 1]), rcond=None)[0]   # (kk,kk)
+            preds["var"] = from_pc(to_pc(W[b:b + 1]) @ A.T)
             # shrink to running mean
             preds["shrink"] = 0.7 * W[b] + 0.3 * W[:b + 1].mean(0)
             # state-input: predict the drift STEP (residual) from state features
             steps = to_pc(W[1:b + 1]) - to_pc(W[:b])
-            Am = Ridge(alpha=1.0).fit(state[:b], steps).coef_
-            preds["state"] = W[b] + (state[b:b + 1] @ Am.T) @ P.T
+            Am = np.linalg.lstsq(mat(state[:b]), steps, rcond=None)[0]            # (4,kk)
+            preds["state"] = W[b] + (mat(state[b:b + 1]) @ Am) @ P.T
             for m in MODELS:
                 pv = np.asarray(preds[m]).ravel()
                 if pv.size != truth.size:
