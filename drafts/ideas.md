@@ -102,8 +102,10 @@ plane (rigid) or *deform* (non-rigid) — which is it here?
   principal drift direction.
 - **Prediction:** does manifold motion (subspace / volume change) **lead** the R² drop on held-out sessions?
 **Caveats:** needs enough units/blocks; per-session `n` is small → hierarchical pooling (Idea 4).
-**Status:** not started; motivates Idea 8. **[now better motivated — `19` shows a dominant *within-session*
-mode (PC1≈0.5) but a *random* cross-session axis.]**
+**Status: PARTLY ANSWERED (2026-10-03, `20`).** Motion is **NOT rigid** (rigid residual 0.88 ≈ identity
+0.89) → the drift is a **deformation** that tracks the R² drop (rho≈−0.38). ⚠️ affine test is
+**degenerate** at 8 points → redesign with ≫ d points. See
+`findings/2026-10-03_manifold_motion_and_repeat.md`.
 
 ## Idea 8 — Rotation-axis as a recalibration **regularizer** (from `18`) **[next step a]**
 `18` gave a **directional** gain (low-rank rotation cos **0.721** vs persistence **0.661**) that is not
@@ -125,7 +127,22 @@ question: *"does the array drift the same way every day?"*
 drift-direction cosine = **+0.05** (≈ random) → **no stable axis across days.**
 See `findings/2026-10-03_drift_axis_consistency.md`.
 
+## Idea 10 — Repeated-movement drift (the "piano") + landmark realignment **[new, from `21`]**
+Units = **keys**; a movement **direction** = a small **piece**; a **time window** = one **performance**.
+Play the *same* piece repeatedly and watch the "chord" (population state for that direction) move.
+Questions: is the move a **shared wobble** (all keys together) or per-key? Can the **1st predict the 5th**?
+Can we **re-align** later performances to the 1st using the directions as landmarks (unsupervised)?
+**Result (`21`, 53 sessions):** chord drift is large (0.72); **a shared mode explains ~45%** (vs 12.5%
+chance) → *there is* a global wobble; but **persistence beats rotation** (0.809 vs 0.765) and **naive
+Procrustes landmark alignment HURTS** (R² 0.289 → 0.058; refit upper bound 0.408).
+**Why it fails & the fix:** Procrustes from only **8 landmarks in high-dim is under-determined** →
+(a) use ≫ d landmarks (per-trial / direction × phase), and (b) do the alignment **in a low-rank
+subspace** (estimate the rotation in the top-k PCs). This is the most promising remaining lead because
+the shared ~45% mode is real.
+**Status:** first pass done; redesign pending (see `findings/2026-10-03_manifold_motion_and_repeat.md`).
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
-the "moving manifold" idea is Idea 7. Revisit in that order: 6 (Perich proxy) → 8 → 9 → 7.*
+the "moving manifold" idea is Idea 7; the "piano" is Idea 10. Revisit order: 7-redesign (≫d points) →
+10-redesign (low-rank alignment) → 6 (Perich proxy) → 8. **9 is closed (negative).***
 
