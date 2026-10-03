@@ -144,8 +144,17 @@ def main():
     check("lagged_stub_drops_L_rows", len(Vl) == len(Zf) - 5, f"{len(Vl)} vs {len(Zf)}-5")
     oal = A.get("out_affine").fit(Zf, ref, decoder=ldec, y=y_full)
     check("out_affine_lagged_no_crash", oal.apply(Vl).shape[0] == len(Vl))
-    check("out_affine_lagged_recovers_identity",
-          np.allclose(oal.apply(Vl), y_full[len(y_full) - len(Vl):], atol=1e-6))
+    # NOTE: Vl -> y_tail is NOT exactly affine-representable (Wd^T need not lie in span(Wl^T)), so we do
+    # NOT assert recovery. We assert the adapter solved the RIGHT least-squares problem on the RIGHT rows.
+    Xl = np.c_[Vl, np.ones(len(Vl))]
+    y_tail = y_full[len(y_full) - len(Vl):]
+    A_exp, *_ = np.linalg.lstsq(Xl, y_tail, rcond=None)
+    check("out_affine_lagged_solves_lstsq_on_TAIL", np.allclose(oal.A, A_exp, atol=1e-8),
+          f"maxdiff={np.abs(oal.A - A_exp).max():.2e}")
+    A_head, *_ = np.linalg.lstsq(Xl, y_full[:len(Vl)], rcond=None)
+    check("out_affine_lagged_rejects_HEAD_alignment", not np.allclose(oal.A, A_head, atol=1e-4),
+          f"head_diff={np.abs(oal.A - A_head).max():.2e}")
+    check("out_affine_lagged_output_finite", np.all(np.isfinite(oal.apply(Vl))))
     oml = A.get("out_mom").fit(Zf, ref, decoder=ldec)
     check("out_mom_lagged_no_crash", oml.apply(Vl).shape[0] == len(Vl))
 

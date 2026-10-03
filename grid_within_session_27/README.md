@@ -90,3 +90,13 @@ Also flagged: P2's two members differ in **label use** — `subspace` is clean (
 `centroid_proc` is **gray** (uses target identity) — so P2 must be evaluated on `subspace` with
 `centroid_proc` reported separately.
 
+5. **The L3 tracer caught a real pre-existing bug.** `out_affine` violated the PLAN §5 row-alignment
+   rule: `np.linalg.lstsq` received `X=(n-L,3)` from a lagged decoder's `predict()` but a FULL-length
+   `y` -> `LinAlgError: Incompatible dimensions`. It is the only adapter that consumes `y` in `fit`, and
+   only lagged decoders (wiener L=5, mlp L=3, gru L=10) shorten predictions. Fixed in
+   `adapters/output.py` (align `y` to the TAIL of `V`); a `LaggedDec` stub + regression tests added to
+   `adapters/selftest.py` -- the old test passed an already-matching-length `y` with a full-length
+   decoder stub, so it could never have seen this.
+   Verified after the fix: tracer emitted **260 rows x 73 cols**, `L3_COL_CHECK: PASS`, zero `[FAIL]`,
+   and on REAL data `r2_vw = 0.30065293128765525` vs `r2_all = 0.30065293128766213` -- the identity
+   confirmed to 14 s.f.
