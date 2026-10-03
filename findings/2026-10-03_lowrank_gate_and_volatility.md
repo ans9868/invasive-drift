@@ -13,8 +13,8 @@ mean states → **velocity field `V_b`** (2K = 16-D). Drift step `dV_b = V_{b+1}
 (A) LOW-RANK?  velocity-field steps (16-D): PC1=0.56  PC1+2=0.80  rank80=2.5/16
                weight-space steps:          PC1=0.44
 (B) VOLATILITY: vs block index rho=+0.17 (weak trend) ; lag-1 autocorr=+0.04 (NOT predictable)
-(C) LEAD/LAG: corr(vol_b, R2_b)   = -0.162
-             corr(vol_b, R2_{b+1}) = -0.162   (no stronger lead)
+(C) LEAD/LAG: corr(vol_b, R2_b)   = -0.239
+             corr(vol_b, R2_{b+1}) = -0.162   (WEAKER than contemporaneous => no lead)
              corr(vol_b, dR2)    = +0.034    (null)
 ```
 
@@ -33,8 +33,11 @@ mean states → **velocity field `V_b`** (2K = 16-D). Drift step `dV_b = V_{b+1}
   block's volatility tells you nothing about the next. Only a weak upward trend (+0.17) over the session.
 
 ### (C) Volatility does NOT lead the R² drop ❌
-- `corr(vol_b, R²_b)` = **−0.162** (weak, contemporaneous) and `corr(vol_b, R²_{b+1})` = **−0.162** —
-  identical, i.e. **no lead**. The R²-*change* correlation is +0.03 (null).
+- `corr(vol_b, R²_b)` = **−0.239** (weak, contemporaneous) vs `corr(vol_b, R²_{b+1})` = **−0.162** —
+  the correlation is **weaker** with the *next* block's R², i.e. **no lead**; the R²-*change* correlation
+  is +0.03 (null).
+  *(Fixed 2026-10-03: the first `23` run had an index bug making the two columns identical; corrected
+  numbers shown. Conclusion unchanged.)*
 - So the "pass a signal that the entropy is going to change to the decoder" idea **does not work here**:
   the entropy isn't predictable and doesn't precede the drop.
 
