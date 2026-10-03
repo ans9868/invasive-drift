@@ -15,6 +15,7 @@
   "N_fracs": [0.1, 0.25, 0.5, 1.0],
   "decoders": ["ridge", "wiener", "kf_posvel", "mlp", "gru"],
   "active_decoders": ["ridge"],
+  "refit_decoders": ["ridge", "wiener", "kf_posvel", "mlp"],
   "adapters": ["identity", "shuffled_ref", "mom_global", "mom_diag", "mom_diag_self", "zca",
                "cov_lowrank", "subspace", "centroid_proc", "null_proj", "out_mom", "out_affine"],
   "gray_adapters": ["centroid_proc"],

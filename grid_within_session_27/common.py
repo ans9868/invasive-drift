@@ -59,6 +59,8 @@ def evaluate_cell(decoder, Ztr, ytr, Zte, yte, ref=None, adapter=None, dirbin_tr
     out["n_eval"] = int(len(pred))
     out["noop"] = bool(noop)
     out["n_params"] = int(getattr(adapter, "n_params", 0) or 0) if adapter is not None else 0
+    out.update(correction_size(adapter, decoder, Zte) if not noop else dict(corr_rel=0.0, corr_rank=0))
+    out["_pred"] = pred              # for cross-decoder agreement (caller pops it)
     return out
 
 
