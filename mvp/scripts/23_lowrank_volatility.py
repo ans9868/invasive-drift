@@ -109,7 +109,7 @@ def main():
         n = min(len(vol), len(r2n))
         if n >= 4:
             LEAD_NEXT.append(sp(vol[:n], r2n[:n]))
-            CONTEMP.append(sp(vol[:n], r2[1:][:n]))
+            CONTEMP.append(sp(vol[:n], r2[:n]))
             dr2 = np.diff(r2)[:n]
             LEAD_DR2.append(sp(vol[:n], dr2))
         print(f"  {os.path.basename(p).split('ses-')[1].split('_')[0]}: nb={len(W)} "
