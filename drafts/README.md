@@ -71,6 +71,14 @@ nonstationarity.
   learning curves** (labeled vs unlabeled, with complexity/params), replacing the earlier fixed-window
   comparison. Key idea: for **unlabeled** adapters data is *free*, so a data-hungry one is a win.
 
+- `18_next_steps_before_after_paper_read.md` — **the plan, frozen on both sides of the 2026-10-03 read of
+  FALCON + NoMAD.** Part A = the next steps as agreed *before* (six open items, three agreed changes, the
+  reframe→grid→staleness→P5→P6/P7 sequence). Part B = the recommendation *after* (reframe promoted to step 1;
+  per-bin CIs **dropped** in favour of across-session std / across-pair IQR + Wilcoxon signed-rank; `r2_vw`,
+  `snr`+half-life and failure counts added; OR/ZS framing; `staleness.py` given FALCON Table-3 shape).
+  Parts C–E = the delta table, what did **not** change, and the four unresolved decisions. Paper *content*
+  lives in `../findings/2026-10-03_prior_art_falcon_nomad.md`.
+
 ## One-line takeaway
 The decomposition is the forecast note's slowest clock (an integral vs a derivative). They can be
 **merged — but only as "forecast the mechanisms," wiring labels<->covariates — not as two stacked

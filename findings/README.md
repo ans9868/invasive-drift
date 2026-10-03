@@ -38,5 +38,21 @@ Dated finding notes from the invasive-drift MVP. One file per topic; newest date
 - `2026-10-03_injection_and_method_validation.md` — injection/coverage; the historical-slope bar;
   accel out; steps need their own layer.
 - `2026-10-03_data_and_infra.md` — datasets (Perich 000688, FALCON 000941), env, Torch compute, workflow.
+- `2026-10-03_adapter_grid_framing.md` — ⭐ **the reframe, written BEFORE the grid ran.** Three registers
+  (classical raw R² / our skill scores / **ceiling** quantities like `r2_persist` that are properties of the
+  behaviour, not decoders); the **pre-registered prediction P1–P4**: the adapter grid is a **ladder in moment
+  order** (`mom_global` → `mom_diag` → `cov_lowrank` → `zca`) vs the **direction-only** family
+  (`subspace`/`centroid_proc`); claim = *the class of alignment method that works is determined by which
+  moment order the drift lives in* (NoMAD ≈ `mom_diag`+`zca`, Aligned FA ≈ direction-only). Also locks the
+  measurement conventions (no per-bin CIs; across-session std / across-pair IQR + signed-rank) and the
+  "do-not-claim" list.
+- `2026-10-03_prior_art_falcon_nomad.md` — **read of the two defining papers.** FALCON = the benchmark
+  (continuous/causal eval, **no trial labels**, R² = **variance-weighted** multi-output, held-in/held-out
+  splits, published baseline table incl. **zero-shot WF 0.34±0.06** on M1-A); NoMAD = the SOTA (LFADS +
+  KL-aligned feedforward net, **per-channel z-scoring** = our normalizer finding, **half-life = ln2/B after
+  SNR = −10log10(1−R²)** = our staleness metric). ⚠️ **Their own within-session half-lives are 3.2 min
+  (static) → 11.7 h (NoMAD+RTI)** → we must cite them and *not* claim within-session drift is unstudied.
+  Also settles the CI question (report across-session std / across-pair IQR + Wilcoxon signed-rank; never
+  per-bin CIs).
 
 Background/thinking docs live in `../drafts/` and `../plan.md`.

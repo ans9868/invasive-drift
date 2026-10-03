@@ -12,7 +12,7 @@
 - **Related:** `../adapters/` (adapter library) · `../drafts/17_plan_27_adapter_curves.md` (discussion
   trail) · `../findings/2026-10-03_lowrank_normalizer.md`, `..._normalizer_perspective.md`.
 
-Status: **PLAN ONLY** — no code yet.
+Status: **P0–P4 code-complete; grid NOT yet run** (all four selftests green on Torch; tracer validated).
 
 ## Progress log
 - **P0 done** — skeleton, `config.json`, scratch layout.
@@ -65,3 +65,28 @@ Status: **PLAN ONLY** — no code yet.
   **`ctx_sess`** and **`ctx_blk`** (two context scopes). `config.json`: `block_min=2.0`, `min_blocks=2`.
   `cache_version → 3`.
 - **Next:** re-run smoke (all 4 selftests + `cache --n 1 --with-decoders`) → **Block 2c**.
+
+## Progress log 5 (pre-run hardening, 2026-10-03)
+Four changes so the CSV carries everything analysis needs — **all must precede the grid run**, because
+`run_grid.py` discards the adapter object and the predictions:
+
+1. **`r2_vw`** added to `metrics.py` (+ 4 tests in `selftest_metrics.py`). **Finding: `r2_vw` ≡ `r2_all`
+   (pooled) by algebraic identity**, and both ≡ sklearn `multioutput='variance_weighted'` = the FALCON/NoMAD
+   metric. So our existing raw R² was *already* on FALCON's scale — verified numerically
+   (|pooled − vw| = 1.4e-13), and contrasted against a *uniform* mean which gave −0.32 vs +0.88.
+2. **Adapter metadata columns** (`form · label_use · aligned · causal · uses_targets · uses_decoder ·
+   is_trainable`) via `run_grid.py::adapter_meta()`. Without these, P1/P2/P3/P5 cannot be grouped by family
+   from the CSV. Static check: 12 registered == 12 configured, no key collisions.
+3. **`refit_decoders` now includes `gru`** (was `ridge/wiener/kf_posvel/mlp`), so every active decoder has an
+   oracle row and the OR/ZS framing is uniform. New `refit_available` column makes any gap self-explaining.
+4. **`active_decoders` = all five.** Plus surfaced `r2_burnin_in`/`r2_burnin_out` (already computed in
+   `cache.fit_decoders`, previously discarded → the overfit gap was unreportable) and the
+   `eval_contiguous` bool that PLAN §5 requires for `lag_bins` validity.
+
+⚠️ **Not fixed here:** P4 as written in `../findings/2026-10-03_adapter_grid_framing.md` ("ΔR² tracks drift
+magnitude, not elapsed time") is **not testable by this grid** — `run_grid.py` emits `block_idx=-1`,
+`t_start_min=NaN`, one row per cell, so there is **no time axis**. P4 belongs to `staleness.py`.
+Also flagged: P2's two members differ in **label use** — `subspace` is clean (unlabeled) but
+`centroid_proc` is **gray** (uses target identity) — so P2 must be evaluated on `subspace` with
+`centroid_proc` reported separately.
+

@@ -48,6 +48,27 @@ def build_ref(z):
                 dirC=z["dirC"], dirOK=z["dirOK"], v_mu0=z["v_mu0"], v_cov0=z["v_cov0"])
 
 
+def adapter_meta(ad_name):
+    """Family metadata, so cells can be grouped at ANALYSIS time (see findings/..._adapter_grid_framing.md).
+
+    REQUIRED pre-run: the grid discards the adapter object, so without these columns P1/P2/P3
+    (moment family vs direction-only family vs shuffled control) cannot be evaluated from the CSV.
+    """
+    if ad_name == "none":
+        return dict(form="frozen", label_use="none", aligned=False, causal=True,
+                    uses_targets=False, uses_decoder=False, is_trainable=False)
+    d = A.get(ad_name).describe()
+    if d["uses_labels"]:
+        lu = "labeled"
+    elif d["uses_targets"]:
+        lu = "gray"                      # target identity, not velocity (PLAN §2)
+    else:
+        lu = "unlabeled"
+    return dict(form=d["stage"], label_use=lu, aligned=bool(d["uses_decoder"]),
+                causal=bool(d["causal"]), uses_targets=bool(d["uses_targets"]),
+                uses_decoder=bool(d["uses_decoder"]), is_trainable=bool(d["is_trainable"]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=os.path.join(HERE, "config.json"))
@@ -67,6 +88,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     dec_names = (args.decoders or ",".join(cfg["active_decoders"])).split(",")
     ad_names = ["none"] + (args.adapters.split(",") if args.adapters else list(cfg["adapters"]))
+    meta_map = {nm: adapter_meta(nm) for nm in ad_names}
     Ns = [float(x) for x in (args.N.split(",") if args.N else cfg["N_fracs"])]
     refit = set(cfg.get("refit_decoders", []))
     K = cfg["dir_bins"]
@@ -90,17 +112,23 @@ def main():
         moving = speed > np.nanpercentile(speed, 60)
         # ---- frozen decoders: pickle cache (hash-checked) else refit ----
         cands = glob.glob(os.path.join(nwb_dir, f"*{sess}*.nwb"))
-        decs = None
+        decs, bmeta = None, None
         if cands:
             obj, st = CACHE.load_decoders(os.path.join(art_dir, f"{sess}.decoders.pkl"),
                                           CACHE.config_hash(cfg, cands[0]))
             if st == "ok":
                 decs = {n: obj["decoders"][n] for n in dec_names if n in obj["decoders"]}
+                bmeta = obj
         if decs is None:
-            decs, _, _ = CACHE.fit_decoders(CACHE.decoder_specs(dec_names), Z, vel, pos, z["burnin"])
+            decs, r2in, r2out = CACHE.fit_decoders(CACHE.decoder_specs(dec_names),
+                                                   Z, vel, pos, z["burnin"])
+            bmeta = {"r2_burnin_in": r2in, "r2_burnin_out": r2out}
+        bin_ = bmeta.get("r2_burnin_in", {}) or {}
+        bout_ = bmeta.get("r2_burnin_out", {}) or {}
         # ---- rows ----
         ei = np.where(geval)[0]
         tri_all = np.where(gfit)[0]
+        eval_contiguous = bool(len(ei) > 1 and np.all(np.diff(ei) == 1))   # PLAN §5: lag_bins validity
         Zte, yte, mte = Z[ei], vel[ei], moving[ei]
         refdv = np.zeros((K, 2), np.float32)
         for k in range(K):
@@ -154,7 +182,11 @@ def main():
                                      n_units=int(z["n_units"]), decoder=dn, objective=ad_name,
                                      N_frac=f, N_samples=n, seed=cfg.get("seed", 0),
                                      r2_refit_oracle=orac[dn], r2_refit_out=outr[dn],
-                                     **md[dn], **agree, **base, **ctxs))
+                                     refit_available=bool(dn in refit),
+                                     r2_burnin_in=float(bin_.get(dn, np.nan)),
+                                     r2_burnin_out=float(bout_.get(dn, np.nan)),
+                                     eval_contiguous=eval_contiguous,
+                                     **meta_map[ad_name], **md[dn], **agree, **base, **ctxs))
         keys = sorted({k for r in rows for k in r})
         with open(os.path.join(out_dir, f"{sess}.csv"), "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=keys)

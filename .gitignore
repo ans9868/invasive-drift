@@ -21,3 +21,6 @@ results/
 # Safety: moved-here instead of deleted (see WORKFLOW.md — never `rm`)
 trash/
 temp-trash/
+
+# Research PDFs + extracted text (copyrighted; never commit)
+research-papers/

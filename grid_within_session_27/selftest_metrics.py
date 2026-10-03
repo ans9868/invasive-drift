@@ -39,6 +39,25 @@ def main():
     check("slope_halved_when_gain_is_2x",
           abs(M.velocity_metrics(v, 2 * v)["slope_vx"] - 0.5) < 0.02)
 
+    print("\nr2_vw (FALCON/NoMAD metric):")
+    # Identity claim: variance-weighted multi-output R2 == pooled R2. v is standardised (equal dim
+    # variances) so the identity is trivial there -> stress it with very UNEQUAL dim variances.
+    va = v * np.array([3.0, 0.25])
+    pa_ = va + rng.normal(scale=0.3, size=va.shape)
+    ma = M.velocity_metrics(va, pa_)
+    check("r2_vw == r2_all under UNEQUAL dim variances",
+          abs(ma["r2_vw"] - ma["r2_all"]) < 1e-8,
+          f"vw={ma['r2_vw']:.9f} pooled={ma['r2_all']:.9f}")
+    w = ((va - va.mean(0)) ** 2).sum(0)
+    r2d = np.array([1.0 - ((pa_[:, i] - va[:, i]) ** 2).sum() / w[i] for i in range(2)])
+    check("r2_vw == variance-weighted mean of per-dim r2",
+          abs(ma["r2_vw"] - float((w * r2d).sum() / w.sum())) < 1e-8)
+    check("weighting MATTERS (r2_vw != uniform mean of per-dim r2)",
+          abs(ma["r2_vw"] - float(r2d.mean())) > 1e-4,
+          f"vw={ma['r2_vw']:.6f} uniform={r2d.mean():.6f}")
+    check("anchor: constant-mean prediction -> r2_vw = 0",
+          abs(M.velocity_metrics(va, np.broadcast_to(va.mean(0), va.shape))["r2_vw"]) < 1e-9)
+
     print("\nlag:")
     L = 7
     pl = np.zeros_like(v); pl[L:] = v[:-L]; pl[:L] = v[0]

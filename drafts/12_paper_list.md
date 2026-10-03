@@ -56,16 +56,23 @@ Legend: **Relevance: 5/5** = must-read / direct; **3/5** = useful support; **1/5
   activity"** — Degenhart et al., *Nature Biomedical Engineering* 2020, doi `10.1038/s41551-020-0542-9`.
   **Relevance: 4/5.** *What:* align low-D latent spaces across days so a decoder keeps working.
   *Why us:* canonical *fix*, not *predict*; a baseline the decomposition would grade.
-- **"Stabilizing brain-computer interfaces through alignment of latent dynamics"** — Karpowicz et al.
-  2022, bioRxiv. **Relevance: 4/5.** *What:* latent-dynamics alignment across sessions. *Why us:*
-  the note's "alignment addresses drift".
+- **NoMAD — "Stabilizing brain-computer interfaces through alignment of latent dynamics"** — Karpowicz,
+  Ali, Wimalasena, Sedler, Keshtkaran, Bodkin, Ma, Rubin, Williams, Cash, Hochberg, Miller & Pandarinath,
+  ***Nature Communications* 16:4662 (2025)**, doi `10.1038/s41467-025-59652-y` (bioRxiv `2022.04.06.487388`).
+  **Relevance: 5/5** *(upgraded from 4/5 — read in full 2026-10-03)*. *What:* LFADS dynamics model on a
+  supervised "Day 0", then an unsupervised feedforward **alignment network** (KL between Day-0/Day-K
+  Generator-state distributions + Poisson reconstruction) on "Day K"; frozen Wiener filter on the latents.
+  *Why us:* the SOTA stabiliser **and** it has already published **within-session half-lives of 3.2 min
+  (static) → 11.7 h (NoMAD+RTI)** on closed-loop human iBCI — i.e. it *quantifies* the phenomenon we study
+  but never plots or forecasts it. It also **z-scores each channel** across days (= our normalizer finding)
+  and uses a **sliding-window causal** inference mode (= our causality choice). Full extraction:
+  `../findings/2026-10-03_prior_art_falcon_nomad.md`. Code: `github.com/snel-repo/nomad`.
 - **"Making brain–machine interfaces robust to future neural variability"** — Sussillo, Stavisky, Kao,
   Ryu, Shenoy, *Nature Communications* 2016, doi `10.1038/ncomms13749`. **Relevance: 4/5.**
   *What:* train RNN decoders under simulated neural noise/dropout for robustness. *Why us:* "future
   variability" in the title — but robustness by training, not a forecast.
-- **NoMAD** — *Nature Communications* 2025. *(author list unverified)* **Relevance: 4/5.**
-  *What:* unsupervised day-to-day "stitch" so a frozen decoder keeps working. *Why us:* the note calls
-  it "G without a forecast."
+- **NoMAD's "stitching" framing** — the note's phrase for it is *"G without a forecast"*; the full
+  verified entry is in Category 3 above (not duplicated here).
 - **Farshchian et al.** — adversarial across-day adaptation, *eLife*. **Relevance: 4/5.** *What:*
   adversarial domain adaptation across sessions.
 - **Ma et al. 2023** — adversarial training for cross-session decoding (per the decomposition proposal).
@@ -97,10 +104,20 @@ Legend: **Relevance: 5/5** = must-read / direct; **3/5** = useful support; **1/5
 
 ## Category 5 — Datasets & benchmarks
 
-- **FALCON Benchmark** — Karpowicz et al., *NeurIPS 2024 Datasets & Benchmarks* / `snel-repo.github.io/falcon/`.
-  **Relevance: 5/5.** *What:* few-shot cross-session iBCI decoding benchmark (held-in / held-out days,
-  5 datasets incl. human iBCI). *Why us:* the **Step-1 baseline to reproduce**; its non-stationarity
-  motivation maps onto our three mechanisms.
+- **FALCON Benchmark** — Karpowicz et al., *Few-shot Algorithms for Consistent Neural Decoding (FALCON)
+  Benchmark*, **NeurIPS 2024 Datasets & Benchmarks**; bioRxiv `10.1101/2024.09.15.613126`;
+  `snel-repo.github.io/falcon/`; code `github.com/snel-repo/falcon-challenge`.
+  **Relevance: 5/5** *(read in full 2026-10-03)*. *What:* 5 datasets (M1-A/M1-B macaque EMG, M2 macaque
+  fingers, H1 human 7-DoF robot arm, H2 human handwriting→WER, B1 songbird→MSE), **NWB on DANDI, CC-BY-4.0**;
+  held-in (full) vs held-out (~1 min calibration) contiguous splits; **continuous, causal, open-loop,
+  trial-label-free** evaluation via EvalAI; **R² = variance-weighted multi-output**, per-session then
+  mean ± std across sessions. *Why us:* **the scoreboard we must be legible on.** Its **Table 3** (WF trained
+  from scratch on ~1 min held-out calibration: M1 0.24, M2 0.14, H1 0.11 vs oracle 0.53 / 0.26 / 0.21) is the
+  field's canonical "what does a calibration budget buy you" curve — the same experiment as our
+  `staleness.py`. Its **hold-out baseline table** (M1-A zero-shot WF **0.34±0.06**, NoMAD+WF 0.49±0.03,
+  NDT2-Multi 0.59±0.07, oracle 0.78±0.04) is the literal set of numbers our zoo must be plotted against.
+  Dandiset **`000941` = M1-A** is the release we already hold. Full extraction:
+  `../findings/2026-10-03_prior_art_falcon_nomad.md`.
 - **Perich & Miller long-term monkey reaching** — DANDI **`000688`** (111 sessions over months).
   **Relevance: 5/5.** *What:* macaque M1/PMd spike times + cursor kinematics, chronic arrays.
   *Why us:* the **spine's testbed**.

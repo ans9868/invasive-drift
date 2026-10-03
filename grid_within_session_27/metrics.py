@@ -3,6 +3,11 @@
 All operate on the EVAL rows only.
   y : (n,2) true velocity        p : (n,2) prediction
 Definitions are LOCKED in PLAN.md section 5b.
+
+SCALE NOTE: `r2_all` (pooled) is IDENTICAL to sklearn's
+`r2_score(y, p, multioutput='variance_weighted')`, i.e. the metric FALCON §2.3 and NoMAD Eq. (4)
+report. `r2_vw` is kept as an independent computation of the same quantity so the identity is
+verified on real data (see `_r2_vw` and selftest_metrics.py). A constant-mean prediction scores 0.
 """
 import numpy as np
 
@@ -11,6 +16,31 @@ EPS = 1e-9
 
 def _r2(y, p):
     return float(1.0 - ((p - y) ** 2).sum() / (((y - y.mean(0)) ** 2).sum() + EPS))
+
+
+def _r2_vw(y, p):
+    """Variance-weighted multi-output R² — the FALCON / NoMAD metric.
+
+    sklearn: `r2_score(y, p, multioutput='variance_weighted')` — "Scores of all outputs are averaged,
+    weighted by the variances of each individual output."
+
+        r2_vw = sum_d w_d * r2_d / sum_d w_d,     w_d = sum_i (y_id - ybar_d)^2
+
+    IDENTITY: this is algebraically EQUAL to the pooled `_r2`:
+        sum_d w_d (1 - num_d/w_d) / sum_d w_d  =  1 - sum_d num_d / sum_d w_d.
+    (sklearn weights by Var(y_d) = w_d/n; a uniform factor n across dimensions leaves the weighted
+    mean unchanged.) So our existing `r2_all` was ALREADY on FALCON's scale.
+
+    Kept as an INDEPENDENT computation (not an alias) so the identity is checked on real data rather
+    than assumed — asserted in selftest_metrics.py. If these two ever diverge, one of them is buggy.
+    """
+    y = np.asarray(y, float); p = np.asarray(p, float)
+    w = ((y - y.mean(0)) ** 2).sum(0)
+    if w.sum() <= EPS:
+        return np.nan
+    num = ((p - y) ** 2).sum(0)
+    r2d = 1.0 - num / np.maximum(w, EPS)
+    return float((w * r2d).sum() / w.sum())
 
 
 def _corr(a, b):
@@ -29,6 +59,7 @@ def velocity_metrics(y, p):
     y = np.asarray(y, float); p = np.asarray(p, float)
     m = {}
     m["r2_all"] = _r2(y, p)
+    m["r2_vw"] = _r2_vw(y, p)      # FALCON/NoMAD metric; == r2_all by identity (see _r2_vw)
     m["r2_vx"] = _r2(y[:, [0]], p[:, [0]])
     m["r2_vy"] = _r2(y[:, [1]], p[:, [1]])
     m["corr_vx"] = _corr(p[:, 0], y[:, 0])

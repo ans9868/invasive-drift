@@ -93,6 +93,14 @@ speed above the 60th percentile; `Δθ` = angle wrap of `θ̂ − θ` into `[−
 
 **Velocity**
 - `r2_all = 1 − Σ‖ŷ−y‖² / Σ‖y−ȳ‖²` (pooled); `r2_vx`, `r2_vy` = same per dimension.
+- `r2_vw` = **variance-weighted multi-output R²**. This is **IDENTICAL to `r2_all`** by algebraic identity
+  (`Σ_d w_d(1−num_d/w_d)/Σ_d w_d = 1 − Σ_d num_d/Σ_d w_d`, with `w_d = SS_d`; sklearn weights by
+  `Var(y_d) = w_d/n`, a uniform factor that leaves the weighted mean unchanged). It is also exactly
+  sklearn `r2_score(..., multioutput='variance_weighted')` — i.e. **the metric FALCON §2.3 and NoMAD Eq. (4)
+  report**. Kept as an *independent* computation so the identity is verified on real data
+  (`selftest_metrics.py`), not assumed.
+  ⚠️ Do **not** substitute a *uniform* mean over dimensions: on synthetic unequal-variance data it returned
+  **−0.32** where the correct variance-weighted value was **+0.88**.
 - `corr_vx/vy` = Pearson(pred, true) per dimension.
 - `mse = mean_rows Σ_d (ŷ−y)²`; `bias_vx/vy = mean(ŷ−y)`.
 - `slope_vx/vy` = OLS slope of **true on predicted** (gain), per dimension.
