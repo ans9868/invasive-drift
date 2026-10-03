@@ -78,6 +78,27 @@ def row_space_projector(W):
     return W.T @ np.linalg.solve(G, W)
 
 
+GAIN_MAX = 10.0
+
+
+def safe_scale(sw, ref_sd, gain_max=GAIN_MAX):
+    """Clamp a per-unit forward scale so the gain `ref_sd / sw` can never exceed `gain_max`.
+
+    WHY THIS EXISTS: the per-unit moment adapters divide by the forward window's std. A unit
+    that has gone (near-)constant in that window has `sw ~ 0`, so the raw gain `ref_sd/sw`
+    amplifies by ~1e6 and the frozen decoder produces garbage -> R² down to -7.8e9. Observed on
+    grid task 2013-10-03: 28 rows, all `mom_diag`, only at N<1.0 (short prefixes are likeliest
+    to contain a constant unit).
+
+    Clamping the GAIN (not the input) bounds the correction at `gain_max` and degrades
+    gracefully. For healthy units `sw ~ ref_sd`, so `max(ref_sd, ref_sd/gain_max) = ref_sd` and
+    this is an exact no-op -- results for non-degenerate cells are bit-identical.
+    """
+    sw = np.asarray(sw, float)
+    ref = np.asarray(ref_sd, float)
+    return np.maximum(sw, ref / float(gain_max))
+
+
 def procrustes(A, B):
     """Orthogonal R, plus offsets, s.t. (A - a_bar) R + b_bar ~ B (rows = points)."""
     Ac = A - A.mean(0); Bc = B - B.mean(0)

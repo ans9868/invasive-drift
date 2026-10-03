@@ -27,29 +27,30 @@ echo "=== L1c selftest (common.evaluate_cell) ==="
 "$E" grid_within_session_27/selftest_common.py
 echo "=== L2 tracer (cache 1 session + decoders) ==="
 "$E" grid_within_session_27/cache.py --n 1 --with-decoders
-echo "=== L3 tracer (run_grid 1 session x 5 decoders x 13 adapters x 4 N) ==="
-"$E" grid_within_session_27/run_grid.py --sessions 1
-echo "=== L3c: new pre-run columns present? ==="
+echo "=== L3 tracer: CANARY session CO-20131220 (the one that exercised the std-floor blow-up) ==="
+"$E" grid_within_session_27/run_grid.py --session CO-20131220
+echo "=== L3c: columns + VALUE-RANGE GUARD ==="
 "$E" - <<'PY'
-import csv, glob, os, time
-fs = sorted(glob.glob("results/raw/*.csv"), key=os.path.getmtime)
-if not fs:
-    print("  *** NO tracer CSV WRITTEN ***")
-    print("  L3_COL_CHECK: FAIL")
+import csv, os, time
+p = "results/raw/CO-20131220.csv"
+if not os.path.exists(p):
+    print("  *** canary CSV MISSING -> L3 crashed ***")
+    print("  L3_CHECK: FAIL")
 else:
-    f = fs[-1]
-    age = time.time() - os.path.getmtime(f)
-    stale = age > 300
-    print("  file=%s  age=%.0fs  %s" % (f, age,
-          "*** STALE -> L3 CRASHED; this is an OLD file ***" if stale else "(fresh)"))
-    r = next(csv.DictReader(open(f)))
+    age = time.time() - os.path.getmtime(p)
+    fh = open(p); r = next(csv.DictReader(fh))
     want = ["r2_vw", "r2_all", "form", "label_use", "aligned", "causal",
             "refit_available", "r2_burnin_in", "r2_burnin_out", "eval_contiguous"]
     bad = [k for k in want if r.get(k) is None]
-    for k in want:
-        v = r.get(k, None)
-        print("  %-18s = %s" % (k, "*** MISSING ***" if v is None else v))
-    print("  n_cols = %d" % len(r))
-    print("  L3_COL_CHECK:", "PASS" if (not bad and not stale) else "FAIL")
+    n = 0; mx = 0.0
+    for row in csv.DictReader(open(p)):
+        n += 1
+        mx = max(mx, abs(float(row["r2_all"])))
+    print("  file=%s  age=%.0fs  rows=%d  cols=%d" % (p, age, n, len(r)))
+    print("  max|r2_all| = %.4g     (GUARD: must be < 1e4; blow-ups were ~1e6-1e9)" % mx)
+    for k in bad:
+        print("     *** MISSING column:", k)
+    ok = (not bad) and age <= 900 and mx < 1e4
+    print("  L3_CHECK:", "PASS" if ok else "FAIL")
 PY
 echo ID_SMOKE_DONE

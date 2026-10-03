@@ -158,30 +158,56 @@ def main():
     oml = A.get("out_mom").fit(Zf, ref, decoder=ldec)
     check("out_mom_lagged_no_crash", oml.apply(Vl).shape[0] == len(Vl))
 
-    print("\ncontract:")
+    print("\nconditioning — near-constant unit in the FIT window (REGRESSION for the std-floor blow-up):")
+    # The original bug: `sw = Zfit.std(0) + 1e-6` -> a unit constant in the fit window gives
+    # sw ~ 1e-6 -> gain ref_sd/sw ~ 1e6 -> garbage predictions -> R2 down to -7.8e9.
+    Zc = Zf.copy(); Zc[:, 0] = 0.0                                  # unit 0 EXACTLY constant in fit
+    Zv = Zf.copy(); Zv[:, 0] = rng.normal(scale=1.0, size=len(Zf))  # but it varies at apply time
+    for nm in ("mom_diag", "mom_diag_self", "shuffled_ref", "mom_global", "null_proj",
+               "zca", "cov_lowrank", "subspace", "centroid_proc", "identity"):
+        a = A.get(nm)
+        mx = float("nan")
+        try:
+            a.fit(Zc, ref, decoder=dec, y=dec.predict(Zc), dirbin=dirbin)
+            inp = dec.predict(Zv) if a.stage == "output" else Zv
+            out = np.asarray(a.apply(inp))
+            mx = float(np.abs(out).max())
+            ok = bool(np.all(np.isfinite(out))) and mx < 1e3
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            print("        err:", nm, exc)
+        check(f"bounded_with_constant_fitunit:{nm}", ok, f"max|out|={mx:.3g}")
+
+    print("\ncontract (shape AND BOUNDEDNESS — shape alone let a 1e6 blow-up pass):")
     for nm in A.list_adapters():
         a = A.get(nm)
         if a.stage != "output":
             continue
+        mx = float("nan")
         try:
             a.fit(Zf, ref, decoder=ldec, y=y_full, dirbin=dirbin)
-            ok = a.apply(Vl).shape[0] == len(Vl)
+            out = np.asarray(a.apply(Vl))
+            mx = float(np.abs(out).max())
+            ok = out.shape[0] == len(Vl) and bool(np.all(np.isfinite(out))) and mx < 1e4
         except Exception as exc:  # noqa: BLE001
             ok = False
             print("        err:", nm, exc)
-        check(f"lagged_contract:{nm}", ok)
+        check(f"lagged_contract:{nm}", ok, f"max|out|={mx:.3g}")
 
     print("\ncontract (full-length decoder):")
     for nm in A.list_adapters():
         a = A.get(nm)
+        mx = float("nan")
         try:
             a.fit(Zf, ref, decoder=dec, y=None, dirbin=dirbin)
             inp = dec.predict(Zf) if a.stage == "output" else Zf
-            ok = a.apply(inp).shape[0] == Zf.shape[0]
+            out = np.asarray(a.apply(inp))
+            mx = float(np.abs(out).max())
+            ok = out.shape[0] == Zf.shape[0] and bool(np.all(np.isfinite(out))) and mx < 1e4
         except Exception as exc:  # noqa: BLE001
             ok = False
             print("        err:", nm, exc)
-        check(f"contract:{nm}", ok)
+        check(f"contract:{nm}", ok, f"max|out|={mx:.3g}")
 
     print(f"\n{'ALL PASS' if not FAILS else 'FAILURES: ' + ', '.join(FAILS)}")
     return 1 if FAILS else 0

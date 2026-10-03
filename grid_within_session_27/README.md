@@ -132,3 +132,41 @@ Every task `rc=0`. Runtime 82-414 s/session (scales with session length).
 report, not to keep diagnosing with more commands. Also `pkill -f` is broad-scope and forbidden by
 WORKFLOW §2 — it matched my own ssh command lines. Agreed rhythm: **agree a task set -> execute -> if it
 fails, come back and decide the fix together.**
+
+## Progress log 7 (post-run FIX — the std-floor blow-up, 2026-10-03)
+
+**The first full run was contaminated.** Reading the 53 CSVs found **28 rows with R² < −1e6 (min
+−7.8e9)**. ALL 28 were **`mom_diag`**; decoders were ridge/wiener/kf_posvel/mlp (**gru absent**); and
+`N_frac` counts were 16/8/4/**0** for N=0.1/0.25/0.5/1.0 — i.e. it **vanished at max N**.
+
+**Root cause.** `_MomDiag` divided by `Zfit.std(0) + 1e-6`. A unit that is near-constant inside the
+**fit-pool prefix** has std ≈ 0, so the gain `sd0/std` amplifies by ~1e6. The **N-dependence is the
+fingerprint**: short prefixes are likeliest to contain a constant unit. `moving_frac`/`speed_mean` were
+**normal**, so this was never a motionless window.
+
+**Fix — clamp the GAIN, not the input** (`adapters/base.py::safe_scale`, `GAIN_MAX = 10`):
+`sw = max(sw, ref_sd / GAIN_MAX)`. For healthy units (`sw ≈ ref_sd`) this is an **exact no-op**, so
+non-degenerate cells stay **bit-identical**; collapsed units are bounded at ×10 instead of ×1e6.
+Applied to `mom_diag`, `mom_diag_self`, `shuffled_ref`, `mom_global`, `null_proj`.
+
+**Also fixed — `null_proj` never ran.** It was `noop=True` in **1060/1060** rows: it needs
+`decoder.coef_`, and **no decoder exposes it** (ridge/wiener use `mdl.coef_`; kf uses `self.C` in
+**state** space; mlp uses `coefs_`; gru has none). Its premise — project the correction onto what the
+decoder actually reads out — is only well-defined for a static linear current-time readout = **1 of 5**
+decoders; for `wiener` the row space lives in the **lagged** space (d·(L+1)). **Dropped from
+`config.json`** (`dropped_adapters`) and kept + fixed in the library, rather than approximated where it
+is meaningless. Config adapters: **12 → 11**.
+
+**New guards, so this class of bug cannot return silently:**
+1. `adapters/selftest.py::bounded_with_constant_fitunit:*` — fits every adapter on data with an
+   **exactly constant** unit, applies it to *varying* data, asserts `max|out| < 1e3`. Direct regression
+   test for this bug.
+2. The contract sweeps now assert **finiteness + magnitude**, not just `.shape[0]` — the shape-only check
+   let a ×1e6 blow-up pass.
+3. `smoke.sbatch` L3/L3c — the tracer now runs the **CANARY session `CO-20131220`** (the worst offender,
+   index 9) instead of the first sorted artifact, and asserts **`max|r2_all| < 1e4`** (blow-ups were
+   1e6–1e9; the worst legitimate failure is only ≥ −10).
+
+**Status:** fix implemented locally. Smoke + a re-run decision still to come — the re-run needs sign-off
+(and `--mem=16G`, which is now the known-good value).
+

@@ -1,7 +1,7 @@
 """Feature-stage adapters (applied to standardised features Z *before* decoding)."""
 import numpy as np
 from .base import (Adapter, register, shrunk_cov, cov_align_map, row_space_projector,
-                   procrustes, _sym_pow)
+                   procrustes, safe_scale, _sym_pow)
 
 _EPS = 1e-6
 
@@ -37,8 +37,9 @@ class ShuffledRef(Adapter):
         return self
 
     def apply(self, A):
-        mw = A.mean(0); sw = A.std(0) + _EPS
-        return (A - mw) / sw * self.sd0[self.perm] + self.mu0[self.perm]
+        r0 = self.sd0[self.perm]; m0 = self.mu0[self.perm]
+        mw = A.mean(0); sw = safe_scale(A.std(0), r0)      # gain <= GAIN_MAX
+        return (A - mw) / sw * r0 + m0
 
 
 @register
@@ -53,7 +54,8 @@ class MomGlobal(Adapter):
         return self
 
     def apply(self, A):
-        return (A - A.mean()) / (A.std() + _EPS) * self.s0 + self.m0
+        sw = safe_scale(A.std(), self.s0)                  # gain <= GAIN_MAX
+        return (A - A.mean()) / sw * self.s0 + self.m0
 
 
 class _MomDiag(Adapter):
@@ -63,15 +65,15 @@ class _MomDiag(Adapter):
 
     def fit(self, Zfit, ref, decoder=None, y=None, dirbin=None):
         self.mu0 = ref["mu0"]; self.sd0 = ref["sd0"]
-        self.mf = Zfit.mean(0); self.sf = Zfit.std(0) + _EPS     # fit-pool moments (causal default)
+        self.mf = Zfit.mean(0); self.sf = Zfit.std(0)            # fit-pool moments (causal default)
         self.n_params = 2 * Zfit.shape[1]
         return self
 
     def apply(self, A):
         if getattr(self, "self_moments", False):
-            mw = A.mean(0); sw = A.std(0) + _EPS
+            mw, sw = A.mean(0), safe_scale(A.std(0), self.sd0)
         else:
-            mw = self.mf; sw = self.sf
+            mw, sw = self.mf, safe_scale(self.sf, self.sd0)      # gain <= GAIN_MAX
         return (A - mw) / sw * self.sd0 + self.mu0
 
 
@@ -195,9 +197,16 @@ class CentroidProc(Adapter):
 
 @register
 class NullProj(Adapter):
-    """ALIGNED: per-unit moment correction, projected onto the decoder's row space (null space untouched).
+    """Per-unit moment correction projected onto the decoder's row space (null space untouched).
 
-    Linear decoders only (uses `decoder.coef_`); no-op otherwise.
+    ⚠️ DROPPED FROM THE GRID (2026-10-03). In the first full run this cell was `noop=True` in
+    1060/1060 rows -- it never ran. It needs `decoder.coef_`, and NO decoder in the zoo exposes it:
+    ridge/wiener wrap their linear map in `mdl.coef_`, kf uses `self.C` in STATE space, mlp uses
+    `coefs_`, gru has no static map. Its premise -- "project the correction onto the subspace the
+    decoder actually reads out" -- is only well-defined for a static linear current-time readout,
+    which is exactly ONE of the five decoders (ridge); for `wiener` the row space lives in the
+    LAGGED space (d*(L+1)), so a d-space projector would be the wrong subspace. Kept in the library
+    (fixed + tested) but removed from `config.json` rather than approximated where it is meaningless.
     """
     name = "null_proj"
     stage = "feature"
@@ -205,7 +214,7 @@ class NullProj(Adapter):
 
     def fit(self, Zfit, ref, decoder=None, y=None, dirbin=None):
         self.mu0 = ref["mu0"]; self.sd0 = ref["sd0"]
-        self.mf = Zfit.mean(0); self.sf = Zfit.std(0) + _EPS
+        self.mf = Zfit.mean(0); self.sf = Zfit.std(0)
         W = getattr(decoder, "coef_", None)
         self.PW = row_space_projector(W) if W is not None else None
         self.noop = self.PW is None
@@ -215,7 +224,7 @@ class NullProj(Adapter):
     def apply(self, A):
         if self.noop:
             return A
-        mom = (A - self.mf) / self.sf * self.sd0 + self.mu0
+        mom = (A - self.mf) / safe_scale(self.sf, self.sd0) * self.sd0 + self.mu0
         return A + (mom - A) @ self.PW
 
     self_moments = True
