@@ -26,3 +26,16 @@ Status: **PLAN ONLY** — no code yet.
   `cca` → `subspace` (SA). Both noted in `adapters/feature.py`.
 - **Next:** P3 `fit.py` (sufficient stats → transforms) + P4 `evaluate.py` (apply + R² → long row);
   then full `cache.py` over 53 sessions; then the tracer bullet (`--n 1 --nwin 2 ridge --N 1.0`).
+
+## Progress log 2 (Step 0.5)
+- **Step 0.5 done** — `metrics.py` + `selftest_metrics.py` (ALL PASS, job `19114193`), per-window **context
+  block** in `cache.py`, non-breaking **KF `trace(P)`** recorder, smoke runs both selftests.
+- **Smoke caught 3 more real bugs:** `MomDiagSelf` emptied by an insert-splice; `cache.py` unpacked the
+  **left** singular vectors instead of the right (`Vh`); a selftest put the direction **exactly on a bin
+  edge** (45°) → use 22.5°.
+- **Context verified** (`CO-20131003`, window 0): `rate_mean=3.47 Hz`, `rate_median=1.38`,
+  `frac_silent=0.169`, `active_units=59/71`, `mean_pairwise_corr=0.083`, `pc1_var=0.19`, `eff_dim=18.4`,
+  **`subspace_angle_deg=47.7`** (matches the ~56° rotation seen earlier), `speed_mean=4.31`,
+  `moving_frac=0.33`, `dir_coverage=8/8`.
+- **Next:** **Step 0** — `baselines.py` (`r2_mean`, `r2_persist_lag1/lag12`, `r2_target` vs ridge, 53
+  sessions) → **Block 3**.
