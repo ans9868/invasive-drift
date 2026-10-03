@@ -56,6 +56,7 @@ def main():
     ap.add_argument("--block-s", type=float, default=120.0)
     ap.add_argument("--k", type=int, default=5)
     ap.add_argument("--n", type=int, default=0)
+    ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
     files = sorted(glob.glob(os.path.join(args.data, "*.nwb")))
     if args.n:
@@ -109,6 +110,14 @@ def main():
             steps = to_pc(W[1:b + 1]) - to_pc(W[:b])
             Am = np.linalg.lstsq(mat(state[:b]), steps, rcond=None)[0]            # (4,kk)
             preds["state"] = W[b] + (mat(state[b:b + 1]) @ Am) @ P.T
+            if args.debug and b == 1 and p == files[0]:
+                print("DBG R sing", np.linalg.svd(R, compute_uv=False)[:3], "||W[b]||",
+                      float(np.linalg.norm(W[b])))
+                for m in MODELS:
+                    print("DBG", m, np.shape(preds[m]), "norm",
+                          float(np.linalg.norm(np.asarray(preds[m]).ravel())))
+                print("DBG vel sd", float(VB[b + 1].std()), "Xn sd",
+                      float(((XB[b + 1] - MB[b]) / SB[b]).std()))
             for m in MODELS:
                 pv = np.asarray(preds[m]).ravel()
                 if pv.size != truth.size:
