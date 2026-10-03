@@ -12,4 +12,4 @@ export PYTHONUNBUFFERED=1
 cd /scratch/ans9868/invasive-drift
 E=/scratch/ans9868/conda_storage/kalman/bin/python
 "$E" mvp/scripts/18_predict_drift.py "$@"
-echo DYN_DONE
+echo ID_PD_DONE

@@ -88,20 +88,24 @@ def main():
             preds["trend"] = 2 * W[b] - W[b - 1]
             # global orthogonal rotation from history
             R = procrustes(W[:b], W[1:b + 1]); preds["rot"] = W[b] @ R
-            # low-rank: project history to top-k PCs, rotate there
-            Wc = W[:b] - W[:b].mean(0)
-            _, _, Vt = svd(Wc, full_matrices=False); P = Vt[:args.k].T  # dim x k
-            Rk = procrustes(W[:b] @ P, W[1:b + 1] @ P)
-            preds["rot_lr"] = (W[b] @ P @ Rk) @ P.T + (W[:b].mean(0) - W[:b].mean(0) @ P @ P.T)
-            # VAR in PC space: W[i+1]_pc ~ A W[i]_pc
-            A = Ridge(alpha=1.0).fit(W[:b] @ P, W[1:b + 1] @ P).coef_
-            preds["var"] = (W[b] @ P @ A.T) @ P.T + (W[:b].mean(0) - W[:b].mean(0) @ P @ P.T)
+            # PC subspace of the historical weights (shared by low-rank models)
+            mean_h = W[:b].mean(0)
+            _, _, Vt = svd(W[:b] - mean_h, full_matrices=False)
+            kk = min(args.k, Vt.shape[0]); P = Vt[:kk].T                # dim x kk
+            to_pc = lambda A_: (A_ - mean_h) @ P                        # (n,dim)->(n,kk)
+            from_pc = lambda Z: Z @ P.T + mean_h                        # (n,kk)->(n,dim)
+            # low-rank rotation in PC subspace
+            Rk = procrustes(to_pc(W[:b]), to_pc(W[1:b + 1]))
+            preds["rot_lr"] = from_pc(to_pc(W[b:b + 1]) @ Rk)[0]
+            # VAR in PC subspace: z_{i+1} ~ A z_i
+            A = Ridge(alpha=1.0).fit(to_pc(W[:b]), to_pc(W[1:b + 1])).coef_
+            preds["var"] = from_pc(to_pc(W[b:b + 1]) @ A.T)[0]
             # shrink to running mean
             preds["shrink"] = 0.7 * W[b] + 0.3 * W[:b + 1].mean(0)
-            # state: predict residual step from state (in PC space)
-            steps = (W[1:b + 1] - W[:b]) @ P
+            # state-input: predict the drift STEP (residual) from state features
+            steps = to_pc(W[1:b + 1]) - to_pc(W[:b])
             Am = Ridge(alpha=1.0).fit(state[:b], steps).coef_
-            preds["state"] = W[b] + state[b] @ Am.T @ P.T
+            preds["state"] = W[b] + (state[b:b + 1] @ Am.T) @ P.T
             for m in MODELS:
                 cos[m].append(cosv(preds[m], truth))
                 # functional: decode NEXT block with predicted decoder (block-b scaling)
