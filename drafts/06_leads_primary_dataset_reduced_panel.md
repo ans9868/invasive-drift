@@ -49,7 +49,10 @@ via `extract_spikes_from_nwbfile` (spike times) plus cursor kinematics + trial t
 description: *"spiking activity — manually spike sorted in three subjects, and threshold crossings in
 the fourth — obtained from up to 192 electrodes per session, cursor position and velocity, and other
 task related metadata."*
-=> **spikes + cursor (pos/vel) + trial metadata; no waveforms, no quality metrics, no raw.**
+=> **spikes + cursor (pos/vel) + trial metadata; no quality metrics, no raw.**
+**CORRECTION (2026-10-03):** the sub-C NWBs **do** contain `units/waveforms` (48 samples/spike) — the
+pipeline simply didn't read them. See `findings/2026-10-03_waveform_probe.md`. So **waveform-based unit
+matching IS available on Perich**; only *continuous raw voltage/LFP* is absent.
 Tasks: center-out (`CO`) and random-target (`RT`); session ids like `c_20161021_center_out_reaching`;
 3–4 rhesus macaques (M1/PMd).
 
@@ -106,11 +109,11 @@ no raw, no impedance, no LFP):
 |---|---|---|
 | firing rate | **YES** | per-unit spike counts in task windows |
 | fraction dead | **YES (approx)** | count units/channels going quiet across sessions |
-| unit-match survival | **YES (spike-train only)** | no waveforms in FALCON/Perich -> match by spike-train / cross-session-correlation, not waveform |
+| unit-match survival | **YES (spike-train OR waveform)** | CORRECTED: Perich sub-C has `units/waveforms` → match by waveform (median corr ≈0.996). FALCON unchecked. |
 | rest-only noise correlations | **YES** | spike-count correlation matrix (rest epochs) |
 | factor-angle vs baseline rest | **YES (approx)** | factor analysis / PCA on rates; angle vs a reference session |
 | decode entropy | **YES** | from the decoder's posterior/softmax at inference |
-| waveform SNR (proxy) | **NO** | confirmed: `Units` = spike times only in FALCON + Perich (no waveforms) |
+| waveform SNR (proxy) | **YES (Perich)** | CORRECTED: Perich sub-C has `units/waveforms` (48 s/spike) → amplitude/kurtosis/stability proxies. FALCON unchecked. |
 | channel SNR (true) | **NO** | needs raw voltage |
 | impedance | **NO** | hardware metadata; not in these releases |
 | **DREDge position/velocity** | **NO** | DREDge needs raw AP/LFP; a unit-position *proxy* only if sorted positions exist |
