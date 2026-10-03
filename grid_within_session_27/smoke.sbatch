@@ -17,6 +17,8 @@ echo "=== L0 selftest (metrics) ==="
 "$E" grid_within_session_27/selftest_metrics.py
 echo "=== L1b selftest (decoder cache round-trip) ==="
 "$E" grid_within_session_27/selftest_cache.py
+echo "=== L1c selftest (common.evaluate_cell) ==="
+"$E" grid_within_session_27/selftest_common.py
 echo "=== L2 tracer (cache 1 session + decoders) ==="
 "$E" grid_within_session_27/cache.py --n 1 --with-decoders
 echo ID_SMOKE_DONE

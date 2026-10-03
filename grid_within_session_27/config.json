@@ -1,6 +1,8 @@
 {
   "seed": 0,
   "burnin_frac": 0.2,
+  "window_min": 3.0,
+  "min_windows": 2,
   "n_windows": 8,
   "pool_frac": 0.8,
   "eval_frac": 0.2,

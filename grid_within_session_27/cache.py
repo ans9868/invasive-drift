@@ -85,20 +85,30 @@ def build(path, cfg):
         if sm.sum() >= cfg["min_dir_samples"]:
             dirC[kk] = Z[sm].mean(0); dirOK[kk] = True
     vbm = vel[bm]
-    W = cfg["n_windows"]
     tstart = t0 + cfg["burnin_frac"] * dur
-    tlen = (ts[-1] - tstart) / W
+    wsec = float(cfg.get("window_min", 3.0)) * 60.0          # FIXED-DURATION windows
+    W = int((ts[-1] - tstart) // wsec)
+    if W < cfg.get("min_windows", 2):
+        raise ValueError(f"too few windows ({W} x {wsec/60:.1f}min)")
+    tlen = wsec
     fit_mask = np.zeros((W, len(ts)), bool); eval_mask = np.zeros((W, len(ts)), bool)
+    win_mask = np.zeros((W, len(ts)), bool)
+    win_t0 = np.full(W, np.nan); win_t1 = np.full(W, np.nan)
     for w in range(W):
         lo = tstart + w * tlen; hi = lo + tlen
         inw = (ts >= lo) & (ts < hi)
         ii = np.where(inw)[0]
         if len(ii) < cfg["min_window_samples"]:
             continue
+        win_mask[w, ii] = True
+        win_t0[w], win_t1[w] = lo - t0, hi - t0
         cut = int(len(ii) * cfg["pool_frac"])
         fit_mask[w, ii[:cut]] = True
         eval_mask[w, ii[cut:]] = True
     valid_w = (fit_mask.sum(1) >= cfg["min_fit_samples"]) & (eval_mask.sum(1) >= 100)
+    n_valid = int(valid_w.sum())
+    session_minutes = float(dur / 60.0)
+    short_recording = bool(n_valid < 5)
     # ---- per-window CONTEXT (computed ONCE per window; broadcast to every cell) ----
     speed = np.linalg.norm(vel, axis=1)
     moving = speed > np.nanpercentile(speed, 60)
@@ -130,8 +140,10 @@ def build(path, cfg):
                 mu0=Z[bm].mean(0), sd0=Z[bm].std(0) + 1e-6, C0=C0, C0k=C0k, P=P, Zref=Z[bm],
                 dirC=dirC, dirOK=dirOK, v_mu0=vbm.mean(0), v_cov0=np.cov(vbm, rowvar=False) + 1e-6 * np.eye(2),
                 m0=m0, s0=s0, fit_mask=fit_mask, eval_mask=eval_mask, valid_w=valid_w,
+                win_mask=win_mask, win_t0=win_t0, win_t1=win_t1,
+                session_minutes=session_minutes, n_windows=n_valid, short_recording=short_recording,
                 ctx=ctx, ctx_names=np.array(ctx_names),
-                n_units=d, dur=dur), (W, int(valid_w.sum()))
+                n_units=d, dur=dur), (W, n_valid)
 
 
 def git_rev():
@@ -163,7 +175,7 @@ def config_hash(cfg, src_path):
     st = os.stat(src_path)
     key = {k: cfg[k] for k in ("burnin_frac", "bin_ms", "tau_ms", "dir_bins", "pca_k", "seed", "decoders")
            if k in cfg}
-    key["cache_version"] = 1        # bump whenever the cached PAYLOAD format changes
+    key["cache_version"] = 2        # bump whenever the cached PAYLOAD format changes
     key["src"] = f"{os.path.basename(src_path)}:{st.st_size}:{int(st.st_mtime)}"
     return hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:12]
 
@@ -279,8 +291,9 @@ def main():
         sess = f.split("ses-")[1].split("_")[0]
         np.savez_compressed(os.path.join(out_dir, f"{sess}.npz"), **art)
         print(f"  {sess}: units={art['n_units']} T={len(art['ts'])} dur={art['dur']/60:.1f}min "
-              f"burnin={int(art['burnin'].sum())} windows_valid={nv}/{W} "
-              f"dirs_ok={int(art['dirOK'].sum())} ({time.time()-t1:.1f}s)")
+              f"burnin={int(art['burnin'].sum())} windows={nv}/{W} (win={cfg['window_min']:.2f}min) "
+              f"short={bool(art['short_recording'])} dirs_ok={int(art['dirOK'].sum())} "
+              f"({time.time()-t1:.1f}s)")
         wv = np.where(art["valid_w"])[0]
         if len(wv):
             i0 = int(wv[0])

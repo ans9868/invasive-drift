@@ -199,10 +199,28 @@ early warning (no labels).
   *decoded* previous output) → an **optimistic anchor**, not a fair competitor.
 **Status:** compute **Stage 0, before P3/P4** — it anchors the interpretation of every other number.
 
+## Idea 16 — **80/20 sanity check** (settle "bug vs setting") **[deferred check]**
+The decoder cache's honest out-of-sample scores came out **negative** (`ridge out = −0.229`,
+`wiener −0.629`, `kf −0.017`, `mlp 0.084`, `gru 0.267`) because `r2_burnin_out` trains on only ~2.2 min.
+Before trusting that, run the **zoo-style** number through the **same pipeline** on the same session
+(`fit first 80% of session → test last 20%`) — it should land ≈ **0.35** for ridge. If it does, the
+pipeline is fine and the negative is purely the (much harsher) setting; if it doesn't, there is a bug.
+~1 min. **Re-anchors the reading of every R² we report.**
+
+## Idea 17 — `r2_burnin_out`: half-split vs **k-fold within burn-in** **[design question]**
+The half-of-burn-in split is the noisiest number we have (tiny training set, variance-sensitive R²).
+A **k-fold within burn-in** (e.g. fit 5/6, test 1/6) keeps the honest out-of-sample meaning while being
+far more stable. *Lean: k-fold.* Decide before P2-scale, since it changes the cached payload.
+
+## Idea 18 — **window-length sensitivity check** (2 / 3 / 4.5 min) **[deferred check]**
+Block duration trades per-cell reliability against gap resolution. Run the staleness instrument on ~5
+sessions at **2 / 3 / 4.5 min** and confirm the *shape* of the curve is stable. *Lean: do it AFTER the
+first real curve* — don't stall the build for it.
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
 the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11;
-direction head is Idea 12; multi-task is Idea 13; uncertainty is Idea 14; non-neural baselines is Idea 15.
-Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment) → 6 (Perich proxy) → 8.
-**9 is closed (negative).***
+direction head is Idea 12; multi-task is Idea 13; uncertainty is Idea 14; non-neural baselines is Idea 15;
+deferred checks are Ideas 16–18. Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment)
+→ 6 (Perich proxy) → 8. **9 is closed (negative).***
 
