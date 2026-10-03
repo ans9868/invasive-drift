@@ -23,6 +23,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+sys.path.insert(0, ROOT)                      # adapters/ lives at the repo root
 sys.path.insert(0, os.path.join(ROOT, "mvp"))
 import adapters as A      # noqa: E402
 import metrics as M       # noqa: E402
