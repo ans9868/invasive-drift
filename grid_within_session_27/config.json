@@ -15,7 +15,7 @@
   "decoders": ["ridge", "wiener", "kf_posvel", "mlp", "gru"],
   "active_decoders": ["ridge"],
   "adapters": ["identity", "shuffled_ref", "mom_global", "mom_diag", "mom_diag_self", "zca",
-               "cov_lowrank", "cca", "centroid_proc", "null_proj", "out_mom", "out_affine"],
+               "cov_lowrank", "subspace", "centroid_proc", "null_proj", "out_mom", "out_affine"],
   "gray_adapters": ["centroid_proc"],
   "data_dir": "data/perich/sub-C",
   "artifact_dir": "artifacts/perich_subC",

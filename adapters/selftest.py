@@ -52,7 +52,7 @@ def main():
     print("registry:")
     names = set(A.list_adapters())
     for nm in ["identity", "shuffled_ref", "mom_global", "mom_diag", "mom_diag_self", "zca",
-               "cov_lowrank", "cca", "centroid_proc", "null_proj", "out_mom", "out_affine"]:
+               "cov_lowrank", "subspace", "centroid_proc", "null_proj", "out_mom", "out_affine"]:
         check(f"registered:{nm}", nm in names)
     check("all_have_stage", all(a["stage"] in ("feature", "output") for a in A.describe_all()))
 
@@ -83,9 +83,9 @@ def main():
     Pl = cl.P
     Cl = np.cov((cl.apply(Zf) - ref["mu0"]) @ Pl, rowvar=False)
     check("cov_lowrank_matches_cov_k", np.allclose(Cl, ref["C0k"], atol=3e-2))
-    cc = A.get("cca").fit(Zf, ref)
-    check("cca_shape", cc.apply(Zf).shape == Zf.shape)
-    check("cca_reduces_ref_distance",
+    cc = A.get("subspace").fit(Zf, ref)
+    check("subspace_shape", cc.apply(Zf).shape == Zf.shape)
+    check("subspace_reduces_ref_distance",
           np.linalg.norm(np.cov(cc.apply(Zf).T) - ref["C0"]) < np.linalg.norm(np.cov(Zf.T) - ref["C0"]))
 
     print("\ngray landmark / aligned:")

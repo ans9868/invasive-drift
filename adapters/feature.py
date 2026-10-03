@@ -86,6 +86,10 @@ class MomDiag(_MomDiag):
 class MomDiagSelf(_MomDiag):
     """Two-pass per-unit moment match (moments from the data being decoded) — the f25 win."""
     name = "mom_diag_self"
+    self_moments = True
+    causal = False
+
+
 @register
 class Zca(Adapter):
     """Full-rank covariance alignment to the reference: A = Cf^{-1/2} C0^{1/2} (min-MSE linear map).
@@ -126,28 +130,28 @@ class CovLowrank(Adapter):
 
 
 @register
-class Cca(Adapter):
-    """Rank-k canonical-correlation alignment fitted by least squares between window and reference."""
-    name = "cca"
+class Subspace(Adapter):
+    """Subspace alignment (SA): align the fit window's top-k principal subspace onto the reference's.
+
+    NOTE: the plan called this cell `cca`, but CCA requires PAIRED samples (the same trials in two views).
+    An unpaired fit-window vs burn-in reference provides none, so unpaired CCA is ill-posed (it reduces to
+    ZCA). Orthogonal subspace alignment is the well-posed unpaired analogue, so this cell is implemented
+    as SA. (`reg_ref` is likewise subsumed by `zca`.)
+    """
+    name = "subspace"
     stage = "feature"
     k = 5
 
     def fit(self, Zfit, ref, decoder=None, y=None, dirbin=None):
         self.mf = Zfit.mean(0); self.mu0 = ref["mu0"]
-        Cfi = _sym_pow(shrunk_cov(Zfit - self.mf), -0.5)
-        C0i = _sym_pow(ref["C0"], -0.5)
-        Xc = (Zfit - self.mf) @ Cfi
-        Yc = (ref["Zref"] - self.mu0) @ C0i
-        T = (Xc.T @ Yc) / len(Xc)
-        U, S, Vt = np.linalg.svd(T, full_matrices=False)
-        q = min(self.k, len(S))
-        Bk = U[:, :q] @ np.diag(S[:q]) @ Vt[:q]
-        self.M = Cfi @ Bk @ _sym_pow(ref["C0"], 0.5)
-        self.n_params = 2 * Zfit.shape[1] * q
+        Pw = np.linalg.svd(Zfit - self.mf, full_matrices=False)[2][:self.k].T
+        P0 = ref["P"]
+        self.T = Pw @ (Pw.T @ P0) @ P0.T
+        self.n_params = 2 * Zfit.shape[1] * min(Pw.shape[1], P0.shape[1])
         return self
 
     def apply(self, A):
-        return (A - self.mf) @ self.M + self.mu0
+        return (A - self.mf) @ self.T + self.mu0
 
 
 @register
