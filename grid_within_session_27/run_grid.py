@@ -76,6 +76,9 @@ def main():
     ap.add_argument("--nwb", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--session", default=None)
+    ap.add_argument("--session-index", type=int, default=0,
+                    help="1-based index into the SORTED artifact list (for SLURM job arrays). "
+                         "Preferred over --session: substring matching can select >1 artifact.")
     ap.add_argument("--decoders", default=None)
     ap.add_argument("--adapters", default=None)
     ap.add_argument("--N", default=None)
@@ -95,6 +98,15 @@ def main():
     files = sorted(glob.glob(os.path.join(art_dir, "*.npz")))
     if args.session:
         files = [f for f in files if args.session in f]
+        if len(files) != 1:
+            print(f"  WARN: --session '{args.session}' matched {len(files)} artifacts "
+                  f"({[os.path.basename(f) for f in files]}) -> use --session-index")
+    if args.session_index:
+        n_all = len(files)
+        if not 1 <= args.session_index <= n_all:
+            print(f"  FATAL: --session-index {args.session_index} out of range 1..{n_all}")
+            return 1
+        files = [files[args.session_index - 1]]
     if args.sessions:
         files = files[:args.sessions]
     spec_map = dict(CACHE.decoder_specs(dec_names))
@@ -198,5 +210,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
 

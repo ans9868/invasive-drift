@@ -24,6 +24,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 
+CACHE_VERSION = 3        # bump whenever the cached PAYLOAD format changes
+
+
 def load_cfg(path):
     with open(path) as fh:
         return json.load(fh)
@@ -192,7 +195,7 @@ def config_hash(cfg, src_path):
     st = os.stat(src_path)
     key = {k: cfg[k] for k in ("burnin_frac", "bin_ms", "tau_ms", "dir_bins", "pca_k", "seed", "decoders")
            if k in cfg}
-    key["cache_version"] = 3        # bump whenever the cached PAYLOAD format changes
+    key["cache_version"] = CACHE_VERSION
     key["src"] = f"{os.path.basename(src_path)}:{st.st_size}:{int(st.st_mtime)}"
     return hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:12]
 
@@ -288,6 +291,10 @@ def main():
     ap.add_argument("--data", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--n", type=int, default=0)
+    ap.add_argument("--index", type=int, default=0,
+                    help="1-based index into the SORTED .nwb list (for SLURM job arrays)")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="skip sessions whose .npz already exists (resume a partial array)")
     ap.add_argument("--with-decoders", action="store_true")
     args = ap.parse_args()
     cfg = load_cfg(args.config)
@@ -295,18 +302,29 @@ def main():
     out_dir = args.out or os.path.join(ROOT, cfg["artifact_dir"])
     os.makedirs(out_dir, exist_ok=True)
     files = sorted(f for f in os.listdir(data_dir) if f.endswith(".nwb"))
-    if args.n:
+    if args.index:
+        if not 1 <= args.index <= len(files):
+            print(f"FATAL: --index {args.index} out of range 1..{len(files)}")
+            return 1
+        files = [files[args.index - 1]]
+    elif args.n:
         files = files[:args.n]
     print(f"config: burnin={cfg['burnin_frac']} block_min={cfg.get('block_min')} pca_k={cfg['pca_k']}")
     print(f"{len(files)} session(s) -> {out_dir}")
     for f in files:
         t1 = time.time()
         try:
+            sess = f.split("ses-")[1].split("_")[0]
+        except IndexError:
+            print("SKIP (no 'ses-' in filename)", f); continue
+        outp = os.path.join(out_dir, f"{sess}.npz")
+        if args.skip_existing and os.path.exists(outp):
+            print(f"  {sess}: SKIP (exists)"); continue
+        try:
             art, (B, nv) = build(os.path.join(data_dir, f), cfg)
         except Exception as exc:  # noqa: BLE001
             print("SKIP", f, exc); continue
-        sess = f.split("ses-")[1].split("_")[0]
-        np.savez_compressed(os.path.join(out_dir, f"{sess}.npz"), **art)
+        np.savez_compressed(outp, **art)
         print(f"  {sess}: units={art['n_units']} T={len(art['ts'])} dur={art['dur']/60:.1f}min "
               f"burnin={int(art['burnin'].sum())} blocks={nv}/{B} (blk={cfg.get('block_min'):.2f}min) "
               f"gfit={int(art['gfit_mask'].sum())} geval={int(art['geval_mask'].sum())} "
@@ -320,7 +338,7 @@ def main():
             td = time.time()
             specs = decoder_specs(cfg.get("decoders", []))
             decs, r2in, r2out = fit_decoders(specs, art["Z"], art["vel"], art["pos"], art["burnin"])
-            meta = {"config_hash": h, "cache_version": 1, "burnin_frac": cfg["burnin_frac"],
+            meta = {"config_hash": h, "cache_version": CACHE_VERSION, "burnin_frac": cfg["burnin_frac"],
                     "bin_ms": cfg["bin_ms"], "tau_ms": cfg["tau_ms"], "seed": cfg.get("seed", 0),
                     "n_fit": int(art["burnin"].sum()), "env": env_versions(), "git": git_rev(),
                     "decoders": list(decs)}
@@ -333,4 +351,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
