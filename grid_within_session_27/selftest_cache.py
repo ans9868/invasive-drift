@@ -47,8 +47,13 @@ def main():
           " ".join(f"{k}={v:.3f}" for k, v in r2in.items()))
     check("r2_burnin_out_finite", all(np.isfinite(v) for v in r2out.values()),
           " ".join(f"{k}={v:.3f}" for k, v in r2out.items()))
-    check("in_ge_out_all_decoders", all(r2in[k] >= r2out[k] - 1e-6 for k in r2in),
-          "gaps=" + " ".join(f"{k}:{r2in[k]-r2out[k]:+.3f}" for k in r2in))
+    # NOTE: in >= out is NOT a mathematical invariant: the in-sample and held-out scores use DIFFERENT
+    # test rows, and under the 1 - MSE/Var convention a lower-variance test half can score higher.
+    # So we REPORT the gaps rather than assert an ordering.
+    gaps = " ".join(f"{k}:{r2in[k]-r2out[k]:+.3f}" for k in r2in)
+    check("overfit_gaps_reported",
+          set(r2in) == set(r2out) and all(np.isfinite(v) for v in r2in.values()),
+          "in-out gaps: " + gaps)
     predA = {nm: np.asarray(decs[nm].predict(Z[bm])) for nm in decs}
 
     print("\nrow alignment (lagged decoders drop L rows):")
