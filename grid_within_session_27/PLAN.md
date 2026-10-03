@@ -26,6 +26,7 @@ Bulk/derived → scratch; small summaries + figures → git.
 | **Objective** | O1 mom_diag · O2 zca · O3 reg_ref · O4 cca · **O5 out_mom** · **O6 out_mlp** · **O7 null_proj** · O8 dynamics · O9 cycle · (O10–12 deep → later) · L1 refit · L2 finetune · L3 out_affine · L4 sup_proc |
 | **Label use** | unlabeled(clean) · labeled · **gray(target identity, reported separately)** |
 | **Data budget N** | `f in {0.10, 0.25, 0.50, 1.00} x |fit pool|` |
+| **Output** | velocity(2-D) · direction(circular) · direction(8-class) · both |
 
 **Decoder-alignment flag** is a first-class column: `agnostic` (O1–O4, O9) vs `aligned` (O5–O8).
 
@@ -48,8 +49,13 @@ Bulk/derived → scratch; small summaries + figures → git.
 
 ## 5. Record schema (long format — one row per cell × window)
 **keys/identity:** `session_id · window_idx · t_start_min · n_units · decoder · objective · form ·
-label_use · aligned · causal · N_frac · N_samples · seed`
-**metrics:** `r2_all · r2_vx · r2_vy · corr_vx/vy · mse · bias_vx/vy · r2_frozen · r2_refit`
+label_use · aligned · causal · output · N_frac · N_samples · seed`
+**metrics — velocity:** `r2_all · r2_vx · r2_vy · corr_vx/vy · mse · bias_vx/vy · slope_vx/vy ·
+mse_bias2 · mse_var · lag_bins · r2_frozen · r2_refit`
+**metrics — direction/speed (Option A, ~free):** `ang_err_mean_deg · ang_bias_deg · ang_abs_err_deg ·
+ang_resultant_R · speed_ratio · speed_corr · dir_acc8`
+**neural context (cheap, explains drift):** `rate_mean · rate_median · frac_silent · active_units ·
+mean_pairwise_corr · pc1_var · eff_dim · subspace_angle_deg`
 **correction size:** `||T-I||_F · det(T) · median|scale-1| · rank(T) · n_params`
 **diagnostics:** `obj_value · align_score · drift_energy_rowspace · drift_energy_nullspace`
 **LR-2 (trainable only):** `epochs_run · loss_init · loss_final · loss_slope · grad_norm_mean/max ·

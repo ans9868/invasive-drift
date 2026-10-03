@@ -156,9 +156,25 @@ solution and the **proper home for a "deep / FALCON-class" model** (the adapter,
 - **Compute plan:** train on N−1 sessions, evaluate on the held-out one (leave-one-session-out).
 **Status:** deferred until the cross-session track; recorded here so it is not lost.
 
+## Idea 12 — Direction-decoding **head** (circular / 8-class) **[Option B — later]**
+Decode **movement direction** explicitly, not only velocity:
+- **Circular regression**: output `(cos θ, sin θ)`.
+- **8-class**: softmax over center-out targets → accuracy + confusion.
+
+**Why:** a population **rotation** (`20`, ~56°) shows up as a **systematic angular bias** — a cleaner,
+more interpretable degradation axis than R², and a direct readout of representational drift. Track the
+**signed mean angle** (systematic) separately from the **circular variance / mean resultant length**
+(scatter). Caveat: 8-class may **saturate** (targets separable) → prefer continuous angular error.
+**Status:** later; depends on the metric columns of Option A (added now).
+
+## Idea 13 — **Multi-task** decoder (velocity + direction) **[Option C — later]**
+One network predicting velocity *and* direction jointly (shared trunk, two heads). Tests whether the two
+targets share drift structure, and whether the direction head acts as a regulariser for velocity.
+**Status:** later; needs a trainable decoder family + the direction head from Idea 12.
+
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;
-the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11.
-Revisit order: 7-redesign (≫d points) → 10-redesign (low-rank alignment) → 6 (Perich proxy) → 8.
-**9 is closed (negative).***
+the "moving manifold" idea is Idea 7; the "piano" is Idea 10; the meta-learned adapter is Idea 11;
+direction head is Idea 12; multi-task is Idea 13. Revisit order: 7-redesign (≫d points) →
+10-redesign (low-rank alignment) → 6 (Perich proxy) → 8. **9 is closed (negative).***
 
