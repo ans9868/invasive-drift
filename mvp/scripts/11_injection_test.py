@@ -10,7 +10,7 @@ def kalman_smooth_known(z, t, sig, q=(1e-4, 1e-5, 1e-6)):
     T = len(z); n = 3
     xs = np.zeros((T, n)); Ps = np.zeros((T, n, n))
     x = np.array([z[0], 0.0, 0.0]); P = np.eye(n) * 1.0
-    Fs = []; 
+    F = np.eye(n); Fs = []
     for i in range(T):
         if i > 0:
             dt = t[i] - t[i - 1]
