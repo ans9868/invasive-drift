@@ -46,6 +46,17 @@ def main():
           " ".join(f"{k}={v:.3f}" for k, v in r2b.items()))
     predA = {nm: np.asarray(decs[nm].predict(Z[bm])) for nm in decs}
 
+    print("\nrow alignment (lagged decoders drop L rows):")
+    check("align_tail_trims", C.align_tail(np.arange(10), np.zeros((7, 2))).tolist() == [3, 4, 5, 6, 7, 8, 9])
+    for nm in decs:
+        check(f"pred_len_le_input:{nm}", len(predA[nm]) <= bm.sum(),
+              f"len={len(predA[nm])} vs {int(bm.sum())}")
+    if "ridge" in predA:
+        check("ridge_keeps_all_rows", len(predA["ridge"]) == int(bm.sum()))
+    if "wiener" in predA:
+        check("wiener_drops_5_rows", len(predA["wiener"]) == int(bm.sum()) - 5,
+              f"len={len(predA['wiener'])}")
+
     print("\nround-trip:")
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "x.decoders.pkl")

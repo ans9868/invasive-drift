@@ -70,6 +70,9 @@ mean_pairwise_corr · pc1_var · eff_dim · subspace_angle_deg`
 **LR-2 (trainable only):** `epochs_run · loss_init · loss_final · loss_slope · grad_norm_mean/max ·
 early_stopped · degenerate_fit · fit_time_s · r2_burnin`
 **flags:** `degenerate · skipped · n_eval_samples · **eval_contiguous** (bool)`
+**ROW-ALIGNMENT RULE (critical):** `wiener` (L=5), `mlp` (L=3) and `gru` (L=10) return **len(X) − L**
+predictions. Every comparison must align targets to the **TAIL**: `y_eval = y_eval[len(pred)-len(y_eval):]`.
+Get this wrong and predictions are silently compared to the wrong rows. (Caught by the L1b smoke test.)
 **CI policy:** CIs are computed **at analysis time** by grouping the per-window rows (never collapse
 in-pipeline).
 **Storage:** Tier A table (~110k rows, few MB) — **keep all**; Tier B raw trajectories → leaders only.

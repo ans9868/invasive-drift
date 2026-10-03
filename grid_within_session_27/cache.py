@@ -187,8 +187,17 @@ def decoder_specs(names):
     return out
 
 
+def align_tail(y, p):
+    """Lagged decoders (wiener/mlp/gru) drop L rows, so align y to the TAIL of the prediction."""
+    y = np.asarray(y)
+    return y[len(y) - len(p):] if len(p) <= len(y) else y
+
+
 def fit_decoders(specs, Z, vel, pos, bm):
-    """Fit every decoder on the BURN-IN rows only (Z is the session-standardised feature matrix)."""
+    """Fit every decoder on the BURN-IN rows only (Z is the session-standardised feature matrix).
+
+    NOTE: wiener/mlp/gru return len(X)-L predictions -> compare against the TAIL of the targets.
+    """
     Zb, vb = Z[bm], vel[bm]
     pb = pos[bm] if pos is not None else None
     decs, r2b = {}, {}
@@ -199,7 +208,8 @@ def fit_decoders(specs, Z, vel, pos, bm):
         else:
             d.fit(Zb, vb)
         p = np.asarray(d.predict(Zb))
-        r2b[nm] = float(1.0 - ((p - vb) ** 2).sum() / (((vb - vb.mean(0)) ** 2).sum() + 1e-12))
+        vt = align_tail(vb, p)
+        r2b[nm] = float(1.0 - ((p - vt) ** 2).sum() / (((vt - vt.mean(0)) ** 2).sum() + 1e-12))
         decs[nm] = d
     return decs, r2b
 
