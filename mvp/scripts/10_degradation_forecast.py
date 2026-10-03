@@ -94,7 +94,7 @@ FEATS = ["rate", "act", "rstd", "corr", "snr", "cv", "drate"]
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/perich/sub-C")
-    ap.add_argument("--block-s", type=float, default=300.0)
+    ap.add_argument("--block-s", type=float, default=120.0)
     ap.add_argument("--ref-frac", type=float, default=0.3)
     args = ap.parse_args()
     rows = []
@@ -103,7 +103,7 @@ def main():
             H, F = session_series(p, args.block_s, args.ref_frac)
         except Exception as exc:
             print("SKIP", os.path.basename(p), exc); continue
-        if len(H) < 5:
+        if len(H) < 4:
             continue
         sm = kalman_smooth(H, args.block_s / 60.0)   # per-minute units
         sess = os.path.basename(p).split("ses-")[1].split("_")[0]
