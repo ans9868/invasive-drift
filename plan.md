@@ -44,9 +44,17 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
   - **CONCLUSIONS:** (a) the bar is the **historical-slope** baseline, not persistence; (b) **acceleration
     is NOT forecastable** (our earlier Δaccel=+0.25 was over-fit) → drop/flag it; (c) **steps need a
     separate change-point layer** (BOCPD/PELT); (d) report **Δ over hist-slope**.
-- **NEXT (12_degradation_v2):** per-block **σ_i (bootstrap)** → known-noise const-accel smoother; baselines
-  **persistence → hist-slope**; **floor-crossing probability**; **BOCPD/PELT** step layer; **drop accel**.
-  Then run on real sessions + sub-M/T.
+- **WAVEFORM PROBE DONE** (`12_waveform_degradation.py`, job 19105071, CO-20150309, 74 units, 57.7 min):
+  within-session waveform **stability ≈ 0.997–0.999**, **waveform drift (1−corr 1st/2nd half) median 0.000
+  / max 0.016**, alive units 72–74 stable; amplitude **417→388 µV (−7%)**.
+  - **⇒ within-session unit waveforms are essentially unchanged → the within-session decoder drift is
+    NOT unit-loss/waveform-driven; it is representational (tuning) or gain.** The −7% amplitude is a
+    candidate gain/SNR effect.
+  - **⇒ waveforms are the wrong probe for *within*-session drift, but the RIGHT probe *cross*-session**
+    (unit death/appearance + identity). Perich has waveforms → unlocks **unit matching** (Track-A / H3
+    blocker) + cross-session amplitude/stability trends = direct unit-loss/isolation/gain evidence.
+- **NEXT:** (a) `12_degradation_v2` (rate vs hist-slope, σ_i, step layer, drop accel); (b) cross-session
+  waveform unit-matching + per-unit amplitude/stability over days (decomposition mechanisms).
 
 - **#1 DONE** (`08_within_forecast.py`, job 19097685). Rich features → **panel 0.570 > trend 0.515 >
   persistence 0.482**; ΔR² over trend **+0.055** (was −0.091). Caveats: corr *worse* than trend
