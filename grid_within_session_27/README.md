@@ -39,3 +39,18 @@ Status: **PLAN ONLY** — no code yet.
   `moving_frac=0.33`, `dir_coverage=8/8`.
 - **Next:** **Step 0** — `baselines.py` (`r2_mean`, `r2_persist_lag1/lag12`, `r2_target` vs ridge, 53
   sessions) → **Block 3**.
+
+## Progress log 3 (Step 0.6 — decoder cache)
+- **Step 0.6 done** — pickle cache + config-hash guard + `selftest_cache.py`. Job `19114705`: **ALL PASS**.
+- **Round-trip PROVEN:** fit → pickle → load → **byte-identical predictions** for all five decoders
+  (`ridge/wiener/kf_posvel/mlp/gru`, `maxdiff=0.00e+00`). Guards verified: `hash_mismatch`, `missing`,
+  `corrupt` all detected.
+- **Smoke caught a CRITICAL bug:** `wiener` (L=5), `mlp` (L=3), `gru` (L=10) return **len(X)−L**
+  predictions → predictions were being compared to the **wrong target rows**. Fixed with `align_tail()`;
+  rule added to PLAN §5.
+- Cache on a real session: `decoders(ecd63a298da0): ridge=0.452 wiener=0.513 kf_posvel=0.475 mlp=0.996
+  gru=0.557 (20.8s)`.
+- ⚠️ **FLAG:** `r2_burnin` is **in-sample** (fit and scored on the same burn-in rows) → inflated, especially
+  `mlp=0.996` (held-out it was 0.576). Proposed fix: score `r2_burnin` on a **held-out half of burn-in**.
+  Decide before P2-scale.
+- **Next:** **Step 0** — `baselines.py` → **Block 3**.
