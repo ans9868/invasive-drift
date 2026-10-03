@@ -51,6 +51,22 @@ class LinDec:
         return X @ self.coef_.T + self.intercept_
 
 
+class LaggedDec:
+    """Mimics wiener (L=5) / mlp (L=3) / gru (L=10): returns len(X)-L predictions (PLAN §5).
+
+    The LinDec above returns FULL-length predictions, so it never exercised the row-alignment rule
+    and hid a real crash in `out_affine` (lstsq incompatible dimensions). Keep this stub.
+    """
+
+    def __init__(self, W, L=5):
+        self.coef_ = W
+        self.intercept_ = np.zeros(2)
+        self.L = L
+
+    def predict(self, X):
+        return (X @ self.coef_.T + self.intercept_)[self.L:]
+
+
 def main():
     rng = np.random.default_rng(0)
     ref = make_ref(rng)
@@ -121,7 +137,32 @@ def main():
     check("out_affine_recovers_identity", np.allclose(oa.apply(dec.predict(Zf)), dec.predict(Zf), atol=1e-6))
     check("out_affine_needs_labels", oa.uses_labels is True)
 
+    print("\nlagged-decoder row alignment (PLAN §5) — REGRESSION for the out_affine crash:")
+    ldec = LaggedDec(rng.normal(size=(2, d)), L=5)
+    Vl = ldec.predict(Zf)
+    y_full = dec.predict(Zf)                     # FULL length, exactly as common.fit_and_apply passes it
+    check("lagged_stub_drops_L_rows", len(Vl) == len(Zf) - 5, f"{len(Vl)} vs {len(Zf)}-5")
+    oal = A.get("out_affine").fit(Zf, ref, decoder=ldec, y=y_full)
+    check("out_affine_lagged_no_crash", oal.apply(Vl).shape[0] == len(Vl))
+    check("out_affine_lagged_recovers_identity",
+          np.allclose(oal.apply(Vl), y_full[len(y_full) - len(Vl):], atol=1e-6))
+    oml = A.get("out_mom").fit(Zf, ref, decoder=ldec)
+    check("out_mom_lagged_no_crash", oml.apply(Vl).shape[0] == len(Vl))
+
     print("\ncontract:")
+    for nm in A.list_adapters():
+        a = A.get(nm)
+        if a.stage != "output":
+            continue
+        try:
+            a.fit(Zf, ref, decoder=ldec, y=y_full, dirbin=dirbin)
+            ok = a.apply(Vl).shape[0] == len(Vl)
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            print("        err:", nm, exc)
+        check(f"lagged_contract:{nm}", ok)
+
+    print("\ncontract (full-length decoder):")
     for nm in A.list_adapters():
         a = A.get(nm)
         try:

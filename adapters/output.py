@@ -48,6 +48,12 @@ class OutAffine(Adapter):
         if self.noop:
             return self
         V = np.atleast_2d(decoder.predict(Zfit))
+        y = np.asarray(y, float)
+        # ROW-ALIGNMENT RULE (PLAN §5): lagged decoders (wiener L=5, mlp L=3, gru L=10) return
+        # len(Zfit) - L predictions, and the harness passes the FULL-length y -> align y to the
+        # TAIL of V, else lstsq gets incompatible dimensions. (Same rule as common.align_tail.)
+        if len(y) > len(V):
+            y = y[len(y) - len(V):]
         X = np.c_[V, np.ones(len(V))]
         self.A, *_ = np.linalg.lstsq(X, y, rcond=None)
         return self
