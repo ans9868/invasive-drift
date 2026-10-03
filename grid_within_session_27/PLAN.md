@@ -138,6 +138,29 @@ speed above the 60th percentile; `Δθ` = angle wrap of `θ̂ − θ` into `[−
 - `r2_target` = R² of predicting the **reference mean velocity of the row's direction bin**;
   **flagged `target_src="velocity_bin"`** (mildly self-referential; not a trial target).
 
+## 5c. Session-length handling (short vs long recordings)
+Because rows are stored **per cell × window**, session length needs **no separate pipeline** — it is a
+`GROUP BY` at analysis time. Three tags are written into **every row**:
+```
+  session_minutes      total session length
+  n_windows            number of blocks the session yielded
+  short_recording      n_windows < 5
+```
+**Three analysis-time views (free — same rows):**
+1. **all sessions** — headline
+2. **`n_windows >= 5`** — clean subset
+3. **length buckets** (`<15 / 15–25 / >25 min`) — per-bucket curves = the **confound check**
+
+**Plus a SUPPORT CURVE:** N (sessions/cells) at each x-value (gap / calibration minutes), so sparse
+tails are *visible* rather than inferred.
+
+**Rules**
+- The `>= 5 blocks` rule applies **only to the staleness instrument** — the grid keeps short sessions.
+- Length is a **real moderator**, not bookkeeping: `19` found drift rate ≈ 1/duration (rho = −0.47;
+  drift saturates).
+- ❌ **No** second pipeline, separate grids, or dropping short sessions from the grid.
+- ❌ No hierarchical model **yet** — only if the bucket view shows the effect is real.
+
 ## 6. Aggregate OUT of that table (never collapse in-pipeline)
 median+IQR · mean+SD · **p10 (worst window)** · late-session R² · slope over windows ·
 frac-of-sessions-improving · **fail fraction** · bimodality check.
