@@ -66,18 +66,17 @@ def session_series(path, block_s, ref_frac):
     keep = ~np.isnan(vel).any(1); X, pos, vel = X[keep], pos[keep], vel[keep]
     nref = int(ref_frac * len(vel))
     dec = MLPDec(L=3, hidden=64, max_iter=150).fit(X[:nref], vel[:nref])
-    t0 = ts0 = None
-    # block loop
     with h5py.File(path, "r") as h:
-        ts = h["processing/behavior/Position/cursor_pos/timestamps"][:]
-    ts = ts[keep]; t0 = ts[0]
+        ts = h["processing/behavior/Position/cursor_pos/timestamps"][:][keep]
+    t0 = ts[0]
     nb = int((ts[-1] - t0) // block_s)
     H, F, prev = [], [], None
     for b in range(nb):
         lo = t0 + b * block_s; hi = lo + block_s; sel = (ts >= lo) & (ts < hi)
-        if sel.sum() < 200:
+        if sel.sum() < 250:
             continue
-        H.append(r2(vel[sel], dec.predict(X[sel])))
+        P = dec.predict(X[sel])
+        H.append(r2(vel[sel][-len(P):], P))
         Xb = X[sel]; rates = Xb.mean(0)
         corr = np.nan
         if Xb.shape[0] > 10 and Xb.shape[1] > 1:
