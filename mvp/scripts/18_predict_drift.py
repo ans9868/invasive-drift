@@ -61,7 +61,7 @@ def main():
     files = sorted(glob.glob(os.path.join(args.data, "*.nwb")))
     if args.n:
         files = files[:args.n]
-    cos = {m: [] for m in MODELS}; mse = {m: 0.0 for m in MODELS}; den = 0.0
+    cos = {m: [] for m in MODELS}; fun = {m: [] for m in MODELS}
     for p in files:
         try:
             X, vel, ts = load(p)
@@ -83,7 +83,7 @@ def main():
         # state features per block (low-dim)
         state = np.array([[bi / nb, float(XB[bi].mean()), float(XB[bi].std()),
                            float(np.abs(VB[bi]).mean())] for bi in range(len(XB))])
-        vel_mean = vel.mean(0)
+        vel_mean = vel.mean(0); ss_sess = float(((vel - vel_mean) ** 2).sum())
         for b in range(1, len(W) - 1):
             truth = W[b + 1]
             preds = {}
@@ -127,13 +127,15 @@ def main():
                 Xn = (XB[b + 1] - MB[b]) / SB[b]
                 scale = np.linalg.norm(W[b]) / (np.linalg.norm(pv) + 1e-12)
                 w2 = (pv * scale).reshape(2, Xn.shape[1])   # predict DIRECTION; keep persistence gain
-                mse[m] += float(((Xn @ w2.T - VB[b + 1]) ** 2).sum())
-            den += float(((VB[b + 1] - vel_mean) ** 2).sum())
+                err = float(((Xn @ w2.T - VB[b + 1]) ** 2).sum())
+                fun[m].append(1.0 - err / (ss_sess + 1e-12))
         print(f"  {os.path.basename(p).split('ses-')[1].split('_')[0]}: nb={len(W)}")
     print(f"\nN={len(cos['persist'])} block-predictions across sessions")
-    print(f"{'model':8s}  {'cos(next w)':>11s}  {'functional R2':>13s}")
+    print(f"{'model':8s}  {'cos(next w)':>11s}  {'mean R2':>8s}  {'med R2':>7s}  {'out|R2|>5':>9s}")
     for m in MODELS:
-        print(f"{m:8s}  {np.nanmean(cos[m]):>11.3f}  {1.0 - mse[m] / (den + 1e-12):>13.3f}")
+        r = np.asarray(fun[m], float)
+        print(f"{m:8s}  {np.nanmean(cos[m]):>11.3f}  {np.nanmean(r):>8.3f}  "
+              f"{np.nanmedian(r):>7.3f}  {np.mean(np.abs(r) > 5):>9.3f}")
 
 
 if __name__ == "__main__":
