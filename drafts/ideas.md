@@ -102,7 +102,8 @@ plane (rigid) or *deform* (non-rigid) — which is it here?
   principal drift direction.
 - **Prediction:** does manifold motion (subspace / volume change) **lead** the R² drop on held-out sessions?
 **Caveats:** needs enough units/blocks; per-session `n` is small → hierarchical pooling (Idea 4).
-**Status:** not started; motivates Idea 8.
+**Status:** not started; motivates Idea 8. **[now better motivated — `19` shows a dominant *within-session*
+mode (PC1≈0.5) but a *random* cross-session axis.]**
 
 ## Idea 8 — Rotation-axis as a recalibration **regularizer** (from `18`) **[next step a]**
 `18` gave a **directional** gain (low-rank rotation cos **0.721** vs persistence **0.661**) that is not
@@ -110,7 +111,9 @@ yet usable functionally. Instead of **refitting** a decoder per block (needs lab
 **align** the current decoder to the **learned rotation axis**: penalize deviation from the estimated
 drift trajectory, or rotate the read-out by the estimated per-block rotation. Test whether this **beats
 both refit and persistence** on held-out blocks, and how it behaves when few blocks have been seen.
-**Status:** not started; direct follow-on to `18`.
+**Status: PARTLY ANSWERED / DEMOTED (2026-10-03, `19`).** The drift axis does **not** transfer across
+sessions (unit-free cosine ≈ +0.05), so a *learned, portable* axis doesn't exist — only a
+**within-session** estimator is usable, and `18` showed that gain is small (0.72 vs 0.66).
 
 ## Idea 9 — Is the **rotation axis stable across days**? **[next step b]**
 Re-estimate the within-session drift rotation per session and measure **axis consistency** across days
@@ -118,7 +121,9 @@ Re-estimate the within-session drift rotation per session and measure **axis con
 random axis → per-session-only correction. Use the **waveform unit matcher (Idea 1/3)** to keep units
 comparable across days, so the axes live in the same coordinate frame. This is the more BCI-relevant
 question: *"does the array drift the same way every day?"*
-**Status:** not started; depends on Idea 1/3 matcher + the `17`/`18` rotation estimator.
+**Status: ANSWERED — NEGATIVE (2026-10-03, `19`).** Unit-free test in velocity space: cross-session
+drift-direction cosine = **+0.05** (≈ random) → **no stable axis across days.**
+See `findings/2026-10-03_drift_axis_consistency.md`.
 
 ---
 *Reviewer note (raw-waveform cause layer) folded into Idea 6; the two `18` follow-ons are Ideas 8–9;

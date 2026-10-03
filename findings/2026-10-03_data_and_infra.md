@@ -17,6 +17,8 @@
 ## Compute notes (Torch)
 - **Partitions idle**: `cpu_short` 253/260 nodes idle; plenty of capacity; no walltime cap.
 - **RAM was over-requested** (jobs used ~1.6 GB, requested 48 GB) → sbatch `--mem` right-sized to **16 G**.
+  **Still generous:** `19` (53 sessions, full loop) peaked at **1.14 GB** and ran in ~50 s on 4 CPUs →
+  jobs could safely drop to **4 G**. Scripts print `peakRSS` + stage timing themselves (no `squeue` polls).
 - **Never poll `squeue`/`sacct` in a loop** (spams the SLURM controller) — use file sentinels + `tail`.
 - Login node `/tmp` is often **full** (6 GB tmpfs) → write everything under `$SCRATCH`.
 - Jobs run on compute nodes (cs6xx); login node python import is slow (NFS).
