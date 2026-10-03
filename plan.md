@@ -64,7 +64,14 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
   - **⇒ waveforms are the wrong probe for *within*-session drift, but the RIGHT probe *cross*-session**
     (unit death/appearance + identity). Perich has waveforms → unlocks **unit matching** (Track-A / H3
     blocker) + cross-session amplitude/stability trends = direct unit-loss/isolation/gain evidence.
-- **NEXT:** (a) `12_degradation_v2` (rate vs hist-slope, σ_i, step layer, drop accel); (b) cross-session
+- **WITHIN-SESSION MECHANISM DONE** (`15_within_session_mechanism.py`, job 19105812, 6 sessions):
+  - **tuning-weight correlation `wcorr` declines over the session** in decaying sessions (e.g.
+    CO-20131003: 0.962→0.314) and stays ~flat in stable ones (CO-20131101: 0.959→0.884).
+  - **firing `rate` is flat** (no gain change); **waveforms stable** (`12`) → **no unit loss**.
+  - **⇒ within-session drift = REPRESENTATIONAL (tuning rotation)**, and the decoder-R² decay tracks it.
+    Exactly the decomposition's "representational drift" mechanism, measured within a session.
+  - **caveat:** `refitR2` (70% of a 2-min block) overfits (negative R²) → recalibratability test needs
+    **larger windows**; `wcorr` is the clean signal.
   waveform unit-matching + per-unit amplitude/stability over days (decomposition mechanisms).
 
 - **#1 DONE** (`08_within_forecast.py`, job 19097685). Rich features → **panel 0.570 > trend 0.515 >
