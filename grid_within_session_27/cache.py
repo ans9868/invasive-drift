@@ -111,9 +111,9 @@ def build(path, cfg):
             continue
         rate = X[rows].mean(0) / bin_s                       # Hz per unit
         Zw = Z[rows] - Z[rows].mean(0)
-        Vw, Sw, _ = np.linalg.svd(Zw, full_matrices=False)
+        _, Sw, Vh = np.linalg.svd(Zw, full_matrices=False)
         e = Sw ** 2
-        Pw = Vw[:, :min(k, Vw.shape[1])]
+        Pw = Vh[:min(k, Vh.shape[0])].T
         cosang = np.linalg.svd(Pw.T @ P, compute_uv=False)
         sub = Zw[rngc.choice(len(Zw), size=min(1500, len(Zw)), replace=False)]
         C = np.corrcoef(sub, rowvar=False)

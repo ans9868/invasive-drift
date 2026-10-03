@@ -55,7 +55,12 @@ def main():
     check("circ_std_is_0_for_constant_bias", d["circ_std_deg"] < 0.01)
     check("speed_ratio_is_2_when_doubled", abs(M.direction_metrics(y, 2 * y, moving)["speed_ratio"] - 2.0) < 1e-6)
     check("dir_acc8_is_1_when_identical", abs(M.direction_metrics(y, y, moving)["dir_acc8"] - 1.0) < 1e-9)
-    check("dir_acc8_drops_under_30deg_rotation", d["dir_acc8"] < 0.5, f"acc8={d['dir_acc8']:.2f}")
+    # use a NON-bin-edge direction for the binning test (45deg sits exactly on an edge)
+    y2 = np.c_[spd * np.cos(np.radians(22.5)), spd * np.sin(np.radians(22.5))]
+    y2r = np.c_[spd * np.cos(np.radians(52.5)), spd * np.sin(np.radians(52.5))]
+    check("dir_acc8_drops_under_30deg_rotation",
+          M.direction_metrics(y2, y2r, moving)["dir_acc8"] < 0.5,
+          f"acc8={M.direction_metrics(y2, y2r, moving)['dir_acc8']:.2f}")
     check("wrap180_bounds", np.all(np.abs(M.wrap180([-540, 181, -181, 359])) <= 180))
 
     print("\nagreement / reliability / kf:")
