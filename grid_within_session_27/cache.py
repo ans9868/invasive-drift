@@ -8,8 +8,10 @@ Tracer usage:
 Outputs <artifact_dir>/<session>.npz and prints a summary + timing + peak RSS.
 """
 import argparse
+import hashlib
 import json
 import os
+import pickle
 import resource
 import sys
 import time
@@ -132,6 +134,95 @@ def build(path, cfg):
                 n_units=d, dur=dur), (W, int(valid_w.sum()))
 
 
+def git_rev():
+    try:
+        import subprocess
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                                       stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return None
+
+
+def env_versions():
+    v = {"numpy": np.__version__}
+    try:
+        import sklearn
+        v["sklearn"] = sklearn.__version__
+    except Exception:
+        pass
+    try:
+        import torch
+        v["torch"] = torch.__version__
+    except Exception:
+        v["torch"] = None
+    return v
+
+
+def config_hash(cfg, src_path):
+    """Hash of the decoder-relevant config + source-file identity (cache invalidation key)."""
+    st = os.stat(src_path)
+    key = {k: cfg[k] for k in ("burnin_frac", "bin_ms", "tau_ms", "dir_bins", "pca_k", "seed", "decoders")
+           if k in cfg}
+    key["src"] = f"{os.path.basename(src_path)}:{st.st_size}:{int(st.st_mtime)}"
+    return hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def decoder_specs(names):
+    sys.path.insert(0, os.path.join(ROOT, "mvp"))
+    import decoders as D
+    table = {"ridge": D.RidgeDec, "wiener": D.WienerDec, "mlp": D.MLPDec}
+    out = []
+    for nm in names:
+        if nm == "kf_posvel":
+            out.append((nm, lambda: D.KalmanDec("posvel")))
+        elif nm == "gru":
+            if getattr(D, "_HAS_TORCH", False):
+                out.append((nm, lambda: D.GRUDec(10)))
+            else:
+                print("  WARN: torch missing -> skipping decoder 'gru'")
+        elif nm in table:
+            out.append((nm, table[nm]))
+        else:
+            raise KeyError(f"unknown decoder: {nm}")
+    return out
+
+
+def fit_decoders(specs, Z, vel, pos, bm):
+    """Fit every decoder on the BURN-IN rows only (Z is the session-standardised feature matrix)."""
+    Zb, vb = Z[bm], vel[bm]
+    pb = pos[bm] if pos is not None else None
+    decs, r2b = {}, {}
+    for nm, ctor in specs:
+        d = ctor()
+        if nm.startswith("kf"):
+            d.fit(Zb, pb, vb)
+        else:
+            d.fit(Zb, vb)
+        p = np.asarray(d.predict(Zb))
+        r2b[nm] = float(1.0 - ((p - vb) ** 2).sum() / (((vb - vb.mean(0)) ** 2).sum() + 1e-12))
+        decs[nm] = d
+    return decs, r2b
+
+
+def save_decoders(path, decs, r2b, meta):
+    with open(path, "wb") as fh:
+        pickle.dump({"meta": meta, "r2_burnin": r2b, "decoders": decs}, fh, protocol=4)
+
+
+def load_decoders(path, expect_hash):
+    """-> (obj, status) with status in {ok, missing, hash_mismatch, unreadable(...)}."""
+    if not os.path.exists(path):
+        return None, "missing"
+    try:
+        with open(path, "rb") as fh:
+            obj = pickle.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"unreadable({exc})"
+    if obj.get("meta", {}).get("config_hash") != expect_hash:
+        return None, "hash_mismatch"
+    return obj, "ok"
+
+
 def main():
     t0 = time.time()
     ap = argparse.ArgumentParser()
@@ -139,6 +230,7 @@ def main():
     ap.add_argument("--data", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--n", type=int, default=0)
+    ap.add_argument("--with-decoders", action="store_true")
     args = ap.parse_args()
     cfg = load_cfg(args.config)
     data_dir = args.data or os.path.join(ROOT, cfg["data_dir"])
@@ -165,6 +257,19 @@ def main():
             i0 = int(wv[0])
             print("    ctx[%d]: " % i0 + "  ".join(
                 f"{nm}={art['ctx'][i0, i]:.3g}" for i, nm in enumerate(art["ctx_names"])))
+        if args.with_decoders:
+            srce = os.path.join(data_dir, f)
+            h = config_hash(cfg, srce)
+            td = time.time()
+            specs = decoder_specs(cfg.get("decoders", []))
+            decs, r2b = fit_decoders(specs, art["Z"], art["vel"], art["pos"], art["burnin"])
+            meta = {"config_hash": h, "burnin_frac": cfg["burnin_frac"], "bin_ms": cfg["bin_ms"],
+                    "tau_ms": cfg["tau_ms"], "seed": cfg.get("seed", 0),
+                    "n_fit": int(art["burnin"].sum()), "env": env_versions(), "git": git_rev(),
+                    "decoders": list(decs)}
+            save_decoders(os.path.join(out_dir, f"{sess}.decoders.pkl"), decs, r2b, meta)
+            print("    decoders(%s): " % h + "  ".join(f"{k}={r2b[k]:.3f}" for k in r2b)
+                  + f"  ({time.time()-td:.1f}s)")
     print(f"[resources] total={time.time()-t0:.1f}s "
           f"peakRSS={resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024:.0f} MB")
     print("CACHE_DONE")

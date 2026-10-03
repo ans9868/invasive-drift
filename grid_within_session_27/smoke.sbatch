@@ -15,6 +15,8 @@ echo "=== L0 selftest (adapters) ==="
 "$E" adapters/selftest.py
 echo "=== L0 selftest (metrics) ==="
 "$E" grid_within_session_27/selftest_metrics.py
-echo "=== L2 tracer (cache 1 session) ==="
-"$E" grid_within_session_27/cache.py --n 1
+echo "=== L1b selftest (decoder cache round-trip) ==="
+"$E" grid_within_session_27/selftest_cache.py
+echo "=== L2 tracer (cache 1 session + decoders) ==="
+"$E" grid_within_session_27/cache.py --n 1 --with-decoders
 echo ID_SMOKE_DONE
