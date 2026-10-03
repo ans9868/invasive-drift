@@ -2,6 +2,15 @@
 
 Non-destructive running plan (nothing here is deleted; options stay until done).
 
+## Torch workflow rules (hard)
+
+- **NEVER poll `squeue` (or `sacct`) in a loop** — it spams the SLURM controller; admins email / can
+  rate-limit. Use **passive file sentinels + `tail` of logs** instead. `squeue`/`sacct` only at
+  milestones (one-shot).
+- Each job writes a **sentinel line** to its `.out` (e.g. `DEG_DONE`, `ZOO_DONE`); check for that line,
+  not the scheduler.
+- Sync via **git**; never `scancel -u` (only specific job IDs).
+
 ## Current status
 
 - **Decoder fixed.** FALCON M1-A = **EMG** task (was wrongly classifying `tgt_loc`). Perich `000688` =
