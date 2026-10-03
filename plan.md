@@ -31,7 +31,18 @@ Non-destructive running plan (nothing here is deleted; options stay until done).
 4. **Cross-session** — implement waveform-based **unit matching** (UnitMatch-style) → cross-session
    `health(t)` + the same ladder; this is also the decomposition's **H3** instrument.
 
-## Log
+## log
+- **RESOURCES (one-shot sinfo/sacct):** partitions mostly idle (cpu_short 253/260 idle). **We over-request
+  RAM** — decoders use ~1.6 GB (requested 48 G); cross-session waveform ~7 GB (requested 32 G). → sbatch
+  `--mem` right-sized to 16 G. No walltime cap on cpu_short.
+- **DEG2 DONE (53 sessions / 446 rows, job 19105335):**
+  - next-block **level**: `model` 1−MSE/MSEpers = **+0.185** vs **hist_slope +0.146** (persist 0) → **modest
+    +0.04 over the true bar**.
+  - next-block **rate (slope)**: hist_slope skill = **0.000** → **no skill** (*model number is a bug*:
+    advanced the slope target with the level formula).
+  - CUSUM steps/session = **0** (threshold or no steps).
+  - **⇒ with 10× data the earlier rate Δ+0.50 EVAPORATED. Only a modest level improvement over hist-slope
+    survives.** Confirms the reviewer: rate/accel are not forecastable at this n; level is, weakly.
 
 - **INJECTION/CONFIRM TEST DONE** (`11_injection_test.py`, job 19104802) — synthetic const-accel smoother,
   n=15, σ=0.05:
