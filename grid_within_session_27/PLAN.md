@@ -111,8 +111,15 @@ speed above the 60th percentile; `Δθ` = angle wrap of `θ̂ − θ` into `[−
 - `subspace_angle_deg` = mean principal angle between the window's top-k PCA subspace and the reference.
 - `speed_mean`, `moving_frac`, `dir_coverage` = # direction bins with ≥ 20 samples.
 
+**Decoder calibration context** (per session × decoder, from `cache.py`)
+- `r2_burnin_in` = fit on burn-in, scored on burn-in (**in-sample → INFLATED**).
+- `r2_burnin_out` = fit on the **first half** of burn-in, scored on the **second half** (time split; honest).
+- `r2_burnin_in − r2_burnin_out` = the **overfitting gap** per decoder.
+
 **Ceiling / overfit**
-- `r2_refit` = decoder fit on the **eval** rows (optimistic oracle).
+- `r2_refit_oracle` = decoder fit on the **eval** rows (in-sample; a BOUND, not achievable).
+- `r2_refit_out` = decoder fit on the window's **fit pool**, scored on the **eval tail** (realistic
+  recalibration). `25`'s "0.446" was `r2_refit_oracle`, so its "headroom" was an oracle headroom.
 - `reliability` = **unit split-half** decoding ceiling: split units randomly in half, fit ridge per half on
   the fit pool, predict eval, correlate the two predictions (mean over vx,vy).
 - `r2_train` = R² of the frozen decoder on the **fit pool**; `fit_time_s`.

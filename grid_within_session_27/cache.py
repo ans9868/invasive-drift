@@ -163,6 +163,7 @@ def config_hash(cfg, src_path):
     st = os.stat(src_path)
     key = {k: cfg[k] for k in ("burnin_frac", "bin_ms", "tau_ms", "dir_bins", "pca_k", "seed", "decoders")
            if k in cfg}
+    key["cache_version"] = 1        # bump whenever the cached PAYLOAD format changes
     key["src"] = f"{os.path.basename(src_path)}:{st.st_size}:{int(st.st_mtime)}"
     return hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:12]
 
@@ -193,30 +194,48 @@ def align_tail(y, p):
     return y[len(y) - len(p):] if len(p) <= len(y) else y
 
 
+def _r2(p, y):
+    return float(1.0 - ((p - y) ** 2).sum() / (((y - y.mean(0)) ** 2).sum() + 1e-12))
+
+
+def _fit_one(nm, ctor, Z, vel, pos):
+    d = ctor()
+    if nm.startswith("kf"):
+        d.fit(Z, pos, vel)
+    else:
+        d.fit(Z, vel)
+    return d
+
+
 def fit_decoders(specs, Z, vel, pos, bm):
-    """Fit every decoder on the BURN-IN rows only (Z is the session-standardised feature matrix).
+    """Fit every decoder on the FULL burn-in (the one we keep), and report BOTH calibration scores.
 
-    NOTE: wiener/mlp/gru return len(X)-L predictions -> compare against the TAIL of the targets.
+      r2_burnin_in  : fit on burn-in, scored on burn-in           (in-sample -> INFLATED)
+      r2_burnin_out : fit on the FIRST HALF of burn-in, scored on the SECOND HALF (honest, time-split)
+
+    NOTE: wiener/mlp/gru return len(X)-L predictions -> align targets to the TAIL (see align_tail).
     """
-    Zb, vb = Z[bm], vel[bm]
-    pb = pos[bm] if pos is not None else None
-    decs, r2b = {}, {}
+    idx = np.where(bm)[0]
+    h = len(idx) // 2
+    i1, i2 = idx[:h], idx[h:]
+    Zb, vb = Z[idx], vel[idx]
+    pb = pos[idx] if pos is not None else None
+    decs, r2in, r2out = {}, {}, {}
     for nm, ctor in specs:
-        d = ctor()
-        if nm.startswith("kf"):
-            d.fit(Zb, pb, vb)
-        else:
-            d.fit(Zb, vb)
+        d = _fit_one(nm, ctor, Zb, vb, pb)
         p = np.asarray(d.predict(Zb))
-        vt = align_tail(vb, p)
-        r2b[nm] = float(1.0 - ((p - vt) ** 2).sum() / (((vt - vt.mean(0)) ** 2).sum() + 1e-12))
+        r2in[nm] = _r2(p, align_tail(vb, p))
+        d2 = _fit_one(nm, ctor, Z[i1], vel[i1], pos[i1] if pos is not None else None)
+        p2 = np.asarray(d2.predict(Z[i2]))
+        r2out[nm] = _r2(p2, align_tail(vel[i2], p2))
         decs[nm] = d
-    return decs, r2b
+    return decs, r2in, r2out
 
 
-def save_decoders(path, decs, r2b, meta):
+def save_decoders(path, decs, r2in, r2out, meta):
     with open(path, "wb") as fh:
-        pickle.dump({"meta": meta, "r2_burnin": r2b, "decoders": decs}, fh, protocol=4)
+        pickle.dump({"meta": meta, "r2_burnin_in": r2in, "r2_burnin_out": r2out,
+                     "decoders": decs}, fh, protocol=4)
 
 
 def load_decoders(path, expect_hash):
@@ -272,14 +291,14 @@ def main():
             h = config_hash(cfg, srce)
             td = time.time()
             specs = decoder_specs(cfg.get("decoders", []))
-            decs, r2b = fit_decoders(specs, art["Z"], art["vel"], art["pos"], art["burnin"])
-            meta = {"config_hash": h, "burnin_frac": cfg["burnin_frac"], "bin_ms": cfg["bin_ms"],
-                    "tau_ms": cfg["tau_ms"], "seed": cfg.get("seed", 0),
+            decs, r2in, r2out = fit_decoders(specs, art["Z"], art["vel"], art["pos"], art["burnin"])
+            meta = {"config_hash": h, "cache_version": 1, "burnin_frac": cfg["burnin_frac"],
+                    "bin_ms": cfg["bin_ms"], "tau_ms": cfg["tau_ms"], "seed": cfg.get("seed", 0),
                     "n_fit": int(art["burnin"].sum()), "env": env_versions(), "git": git_rev(),
                     "decoders": list(decs)}
-            save_decoders(os.path.join(out_dir, f"{sess}.decoders.pkl"), decs, r2b, meta)
-            print("    decoders(%s): " % h + "  ".join(f"{k}={r2b[k]:.3f}" for k in r2b)
-                  + f"  ({time.time()-td:.1f}s)")
+            save_decoders(os.path.join(out_dir, f"{sess}.decoders.pkl"), decs, r2in, r2out, meta)
+            print("    decoders(%s): " % h + "  ".join(
+                f"{k}:in={r2in[k]:.3f}/out={r2out[k]:.3f}" for k in r2in) + f"  ({time.time()-td:.1f}s)")
     print(f"[resources] total={time.time()-t0:.1f}s "
           f"peakRSS={resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024:.0f} MB")
     print("CACHE_DONE")

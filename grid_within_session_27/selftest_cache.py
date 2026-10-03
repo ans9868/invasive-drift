@@ -27,7 +27,8 @@ def main():
     rng = np.random.default_rng(0)
     n, d = 1500, 12
     Z = rng.normal(size=(n, d))
-    vel = rng.normal(size=(n, 2))
+    W = rng.normal(size=(d, 2))
+    vel = Z @ W + rng.normal(scale=0.5, size=(n, 2))     # real signal so R2 is not ~0
     pos = np.cumsum(vel, axis=0) * 0.02
     bm = np.zeros(n, bool); bm[:700] = True
 
@@ -40,10 +41,14 @@ def main():
         print("  (gru round-trip SKIPPED:", exc, ")")
 
     print("fit on burn-in:")
-    decs, r2b = C.fit_decoders(specs, Z, vel, pos, bm)
+    decs, r2in, r2out = C.fit_decoders(specs, Z, vel, pos, bm)
     check("all_decoders_fitted", len(decs) == len(specs), f"{list(decs)}")
-    check("r2_burnin_finite", all(np.isfinite(v) for v in r2b.values()),
-          " ".join(f"{k}={v:.3f}" for k, v in r2b.items()))
+    check("r2_burnin_in_finite", all(np.isfinite(v) for v in r2in.values()),
+          " ".join(f"{k}={v:.3f}" for k, v in r2in.items()))
+    check("r2_burnin_out_finite", all(np.isfinite(v) for v in r2out.values()),
+          " ".join(f"{k}={v:.3f}" for k, v in r2out.items()))
+    check("in_ge_out_all_decoders", all(r2in[k] >= r2out[k] - 1e-6 for k in r2in),
+          "gaps=" + " ".join(f"{k}:{r2in[k]-r2out[k]:+.3f}" for k in r2in))
     predA = {nm: np.asarray(decs[nm].predict(Z[bm])) for nm in decs}
 
     print("\nrow alignment (lagged decoders drop L rows):")
@@ -60,7 +65,7 @@ def main():
     print("\nround-trip:")
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "x.decoders.pkl")
-        C.save_decoders(p, decs, r2b, {"config_hash": "abc123", "env": C.env_versions()})
+        C.save_decoders(p, decs, r2in, r2out, {"config_hash": "abc123", "env": C.env_versions()})
         obj, st = C.load_decoders(p, "abc123")
         check("status_ok", st == "ok", f"status={st}")
         for nm in decs:
@@ -68,13 +73,14 @@ def main():
             check(f"pred_identical:{nm}", predA[nm].shape == predB.shape and
                   np.allclose(predA[nm], predB, atol=1e-6),
                   f"maxdiff={np.abs(predA[nm]-predB).max():.2e}")
-        check("r2_burnin_preserved", obj["r2_burnin"] == r2b)
+        check("r2_burnin_in_preserved", obj["r2_burnin_in"] == r2in)
+        check("r2_burnin_out_preserved", obj["r2_burnin_out"] == r2out)
         check("env_versions_present", "numpy" in obj["meta"]["env"])
 
     print("\nguards:")
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "x.decoders.pkl")
-        C.save_decoders(p, decs, r2b, {"config_hash": "abc123"})
+        C.save_decoders(p, decs, r2in, r2out, {"config_hash": "abc123"})
         _, st2 = C.load_decoders(p, "DIFFERENT")
         check("hash_mismatch_detected", st2 == "hash_mismatch", f"status={st2}")
         _, st3 = C.load_decoders(os.path.join(td, "nope.pkl"), "abc123")
