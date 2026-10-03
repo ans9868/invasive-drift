@@ -9,6 +9,12 @@
 #SBATCH --error=/scratch/ans9868/invasive-drift/logs/id_smoke_%j.err
 set -uo pipefail
 export PYTHONUNBUFFERED=1
+# Point ALL temp/scratch usage at $SCRATCH — the login-node /tmp is a 6 GB tmpfs that is 100% FULL,
+# and export_paths.sh is NOT sourced in non-interactive shells, so TMPDIR arrives UNSET.
+export TMPDIR="${SCRATCH:-/scratch/${USER}}/invasive-drift/tmp"
+mkdir -p "$TMPDIR"
+export TMP="$TMPDIR"
+export TEMP="$TMPDIR"
 cd /scratch/ans9868/invasive-drift
 E=/scratch/ans9868/conda_storage/kalman/bin/python
 echo "=== L0 selftest (adapters) ==="
