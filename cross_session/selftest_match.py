@@ -22,15 +22,23 @@ def check(name, cond, extra=""):
 
 
 def template(rng, n, W=48):
-    """n distinct spike-ish waveforms: biphasic, unit-specific width/position/amplitude."""
+    """n spike-ish waveforms, made DELIBERATELY SEPARABLE.
+
+    This tests the matcher's *mechanics*. Whether REAL waveforms are separable is a different
+    question, and is answered by the `--null` diagnostic in match_units.py on real data -- not here.
+    (An earlier version of this test used very similar shapes, which made unrelated units correlate
+    above threshold and the test fail: correct behaviour from the test, wrong question asked.)
+    """
     t = np.linspace(-1, 1, W)
     out = np.zeros((n, W), np.float32)
     for i in range(n):
-        a = 1.0 + 0.4 * rng.normal()
-        c = rng.uniform(-0.4, 0.4)
-        w = 0.15 + 0.08 * abs(rng.normal())
-        out[i] = (a * np.exp(-((t - c) ** 2) / (2 * w ** 2))
-                  - 0.5 * a * np.exp(-((t - c - 0.25) ** 2) / (2 * (w * 1.5) ** 2)))
+        a = rng.choice([-1.0, 1.0]) * (0.5 + rng.uniform(0, 1.5))
+        c = rng.uniform(-0.5, 0.5)
+        w = 0.05 + 0.22 * rng.uniform() ** 2
+        sh = a * np.exp(-((t - c) ** 2) / (2 * w ** 2))
+        if rng.random() < 0.5:      # half get a second phase
+            sh = sh - 0.6 * a * np.exp(-((t - c - 0.2) ** 2) / (2 * w ** 2))
+        out[i] = sh + rng.normal(scale=0.02, size=W)
     return out
 
 
@@ -68,6 +76,9 @@ def main():
     check("amplitude_x100_same_match_count", len(iA2) == len(iA), f"{len(iA2)} vs {len(iA)}")
 
     print("\nunrelated units do NOT match:")
+    other = template(rng, n, W)                     # a DIFFERENT population of units
+    iAo, iBo, _ = MU.match(A, other, 0.90)
+    check("unrelated_population_matches_few", len(iAo) <= 2, f"matched={len(iAo)}")
     noise = rng.normal(size=(n, W)).astype(np.float32)
     iAn, iBn, _ = MU.match(A, noise, 0.90)
     check("noise_matches_nothing", len(iAn) == 0, f"matched={len(iAn)}")

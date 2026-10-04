@@ -129,8 +129,9 @@ def main():
         print("FATAL: need >= 2 sessions")
         return 1
 
-    hdr = ("pair", "nA", "nB", "matched", "fracA", "med_corr", "p10_corr", "sym_frac", "wall_s")
-    print("\n%-24s %5s %5s %8s %7s %9s %9s %8s %7s" % hdr)
+    hdr = ("pair", "nA", "nB", "matched", "fracA", "med_corr", "p10_corr", "sym",
+           "null_med", "null_p95", "margin")
+    print("\n%-24s %5s %5s %8s %7s %9s %9s %7s %9s %9s %8s" % hdr)
     rows = []
     npairs = len(means) - 1 if not args.pairs else min(args.pairs, len(means) - 1)
     for k in range(npairs):
@@ -142,19 +143,33 @@ def main():
         sBA = set(zip(iA2.tolist(), iB2.tolist()))
         sym = len(sAB & sBA) / max(1, len(sAB | sBA))
         cs = C[iA, iB] if len(iA) else np.array([])
+        # DISCRIMINABILITY NULL: the correlation distribution over UNRELATED (unmatched) unit pairs.
+        # If this null sits just below the threshold, then "matched" is NOT evidence of identity --
+        # it may just be the common spike shape. This is the check that decides whether unit
+        # matching means anything at all, so it is computed and reported for every pair.
+        mk = np.ones(C.shape, bool)
+        if len(iA):
+            mk[iA, iB] = False
+        off = C[mk] if mk.any() else np.array([np.nan])
+        null_med = float(np.median(off))
+        null_p95 = float(np.percentile(off, 95))
+        null_max = float(np.max(off))
+        margin = (float(np.median(cs)) - null_p95) if len(cs) else float("nan")
         wall = time.time() - ta
         name = f"{ids[k]}__{ids[k + 1]}"
         np.savez_compressed(os.path.join(mdir, name + ".npz"), idxA=iA, idxB=iB, corr=cs,
-                            nA=A.shape[0], nB=B.shape[0], thresh=args.thresh, wall_s=wall)
+                            nA=A.shape[0], nB=B.shape[0], thresh=args.thresh, wall_s=wall,
+                            null_med=null_med, null_p95=null_p95, null_max=null_max, margin=margin)
         row = dict(pair=name, A=ids[k], B=ids[k + 1], nA=A.shape[0], nB=B.shape[0],
                    matched=len(iA), fracA=len(iA) / max(1, A.shape[0]),
                    med_corr=float(np.median(cs)) if len(cs) else 0.0,
                    p10_corr=float(np.percentile(cs, 10)) if len(cs) else 0.0,
-                   sym_frac=sym, wall_s=wall)
+                   sym_frac=sym, null_med=null_med, null_p95=null_p95, null_max=null_max,
+                   margin=margin, wall_s=wall)
         rows.append(row)
-        print("%-24s %5d %5d %8d %7.2f %9.3f %9.3f %8.3f %7.1f" % (
-            name, row["nA"], row["nB"], row["matched"], row["fracA"],
-            row["med_corr"], row["p10_corr"], sym, wall))
+        print("%-24s %5d %5d %8d %7.2f %9.3f %9.3f %8.3f %9.3f %9.3f %8.3f" % (
+            name, row["nA"], row["nB"], row["matched"], row["fracA"], row["med_corr"],
+            row["p10_corr"], sym, null_med, null_p95, margin))
 
     # INDICATIVE forward chain: follow each session-0 unit forward through the per-pair matches.
     # Greedy composition (not a proper union-find), so a unit whose target is already claimed dies.
