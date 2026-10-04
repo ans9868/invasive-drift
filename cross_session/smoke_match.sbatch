@@ -22,10 +22,13 @@ export TEMP="$TMPDIR"
 cd /scratch/ans9868/invasive-drift
 E=/scratch/ans9868/conda_storage/kalman/bin/python
 echo "node=$(hostname) TMPDIR=${TMPDIR}"
+FAILS=0
 echo "=== L0 selftest (cross_session/match_units) ==="
-"$E" cross_session/selftest_match.py
+"$E" cross_session/selftest_match.py || FAILS=$((FAILS + 1))
 echo "=== L1 real loader: 3 sessions, ragged-index DIAGNOSTICS ==="
-"$E" cross_session/match_units.py --n 3 --diag --out artifacts/cross_session_smoke
+"$E" cross_session/match_units.py --n 3 --diag --out artifacts/cross_session_smoke || FAILS=$((FAILS + 1))
 echo "=== L1c summary.csv ==="
-cat artifacts/cross_session_smoke/summary.csv 2>/dev/null || echo "(no summary)"
+cat artifacts/cross_session_smoke/summary.csv 2>/dev/null || { echo "(no summary)"; FAILS=$((FAILS + 1)); }
+echo "=== VERDICT ==="
+if [ "$FAILS" -eq 0 ]; then echo "MATCH_SMOKE: PASS"; else echo "MATCH_SMOKE: FAIL ($FAILS failing stage(s))"; fi
 echo MATCH_SMOKE_DONE

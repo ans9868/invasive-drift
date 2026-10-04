@@ -42,11 +42,12 @@ def main():
 
     A = template(rng, n, W)
     fresh = template(rng, n - shared, W)
-    perm = rng.permutation(n)
+    slots = rng.choice(n, size=shared, replace=False)   # where A's first `shared` units land in B
+    rest = np.setdiff1d(np.arange(n), slots)
     B = np.zeros((n, W), np.float32)
-    B[:shared] = A[:shared][perm[:shared]]      # the SAME units, permuted position
-    B[shared:] = fresh                          # units that appear fresh / have no partner
-    truth = {i: int(perm[i]) for i in range(shared)}     # A[i] -> B position
+    B[slots] = A[:shared]                       # the SAME units, at permuted positions
+    B[rest] = fresh                             # units that are fresh / have no partner
+    truth = {i: int(slots[i]) for i in range(shared)}   # A[i] -> its position in B
 
     # realistic day-to-day perturbation: jitter + amplitude change (amplitude was ~-7%/session)
     Bjit = B.copy()
